@@ -153,8 +153,8 @@ export function Component() {
                             try {
                               await deleteBudget.mutateAsync(row.id);
                               toast.success("Budget deleted");
-                            } catch {
-                              toast.error("Failed to delete budget");
+                            } catch (err) {
+                              toast.error(`Failed to delete budget: ${err instanceof Error ? err.message : err}`);
                             }
                           }}
                         >
@@ -293,8 +293,8 @@ function AddBudgetDialog() {
       setOpen(false);
       setCategoryId("");
       setAmount("");
-    } catch {
-      toast.error("Failed to create budget");
+    } catch (err) {
+      toast.error(`Failed to create budget: ${err instanceof Error ? err.message : err}`);
     }
   }
 

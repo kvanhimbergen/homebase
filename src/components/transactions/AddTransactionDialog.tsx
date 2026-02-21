@@ -71,8 +71,8 @@ export function AddTransactionDialog() {
       toast.success("Transaction added");
       reset();
       setOpen(false);
-    } catch {
-      toast.error("Failed to add transaction");
+    } catch (err) {
+      toast.error(`Failed to add transaction: ${err instanceof Error ? err.message : err}`);
     }
   }
 

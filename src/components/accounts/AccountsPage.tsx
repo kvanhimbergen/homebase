@@ -64,8 +64,8 @@ export function Component() {
         id,
         data: { is_hidden: !currentlyHidden },
       });
-    } catch {
-      toast.error("Failed to update account");
+    } catch (err) {
+      toast.error(`Failed to update account: ${err instanceof Error ? err.message : err}`);
     }
   }
 
@@ -357,8 +357,8 @@ function AddManualAccountDialog() {
       setName("");
       setType("depository");
       setBalance("");
-    } catch {
-      toast.error("Failed to add account");
+    } catch (err) {
+      toast.error(`Failed to add account: ${err instanceof Error ? err.message : err}`);
     }
   }
 
