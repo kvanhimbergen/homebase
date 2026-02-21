@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useHousehold } from "@/hooks/useHousehold";
+import { seedDefaultCategories } from "@/services/household";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -18,7 +20,20 @@ export function CreateHouseholdDialog() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    createHousehold.mutate(name.trim());
+
+    createHousehold.mutate(name.trim(), {
+      onSuccess: async (household) => {
+        try {
+          await seedDefaultCategories(household.id);
+        } catch {
+          // Categories can be added later
+        }
+        toast.success("Household created!");
+      },
+      onError: (error) => {
+        toast.error(`Failed to create household: ${error.message}`);
+      },
+    });
   }
 
   return (

@@ -50,9 +50,14 @@ export function useHousehold() {
 
   const createHousehold = useMutation({
     mutationFn: async (name: string) => {
+      // Get the authenticated user directly from the session
+      // to avoid stale React state issues
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error("Not authenticated");
+
       const { data: household, error: hError } = await supabase
         .from("households")
-        .insert({ name, owner_id: user!.id })
+        .insert({ name, owner_id: authUser.id })
         .select()
         .single();
       if (hError) throw hError;
@@ -61,7 +66,7 @@ export function useHousehold() {
         .from("household_members")
         .insert({
           household_id: household.id,
-          user_id: user!.id,
+          user_id: authUser.id,
           role: "owner",
         });
       if (mError) throw mError;
@@ -69,7 +74,7 @@ export function useHousehold() {
       await supabase
         .from("user_profiles")
         .update({ default_household_id: household.id })
-        .eq("id", user!.id);
+        .eq("id", authUser.id);
 
       return household;
     },
