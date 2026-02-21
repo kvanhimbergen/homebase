@@ -195,6 +195,7 @@ Deno.serve(async (req) => {
             name: txn.name,
             merchant_name: txn.merchant_name ?? null,
             source: "plaid" as const,
+            classified_by: categoryId ? "plaid" : null,
           },
           { onConflict: "plaid_transaction_id" }
         );
@@ -222,6 +223,7 @@ Deno.serve(async (req) => {
             name: txn.name,
             merchant_name: txn.merchant_name ?? null,
             source: "plaid" as const,
+            classified_by: categoryId ? "plaid" : null,
           },
           { onConflict: "plaid_transaction_id" }
         );

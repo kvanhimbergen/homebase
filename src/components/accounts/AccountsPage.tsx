@@ -44,6 +44,7 @@ import {
   useExchangePublicToken,
   useSyncTransactions,
 } from "@/hooks/usePlaid";
+import { useClassifyTransactions } from "@/hooks/useTransactions";
 import { formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -310,6 +311,7 @@ function PlaidConnectButton() {
   const createLinkToken = useCreateLinkToken();
   const exchangeToken = useExchangePublicToken();
   const syncTransactions = useSyncTransactions();
+  const classifyTxns = useClassifyTransactions();
   const [linkToken, setLinkToken] = useState<string | null>(null);
 
   async function handleClick() {
@@ -343,6 +345,7 @@ function PlaidConnectButton() {
           onDone={() => setLinkToken(null)}
           exchangeToken={exchangeToken}
           syncTransactions={syncTransactions}
+          classifyTransactions={classifyTxns}
         />
       )}
     </>
@@ -354,11 +357,13 @@ function PlaidLinkWidget({
   onDone,
   exchangeToken,
   syncTransactions,
+  classifyTransactions,
 }: {
   linkToken: string;
   onDone: () => void;
   exchangeToken: ReturnType<typeof useExchangePublicToken>;
   syncTransactions: ReturnType<typeof useSyncTransactions>;
+  classifyTransactions: ReturnType<typeof useClassifyTransactions>;
 }) {
   const { currentHouseholdId } = useHousehold();
 
@@ -377,13 +382,23 @@ function PlaidLinkWidget({
         toast.info("Syncing transactions...");
         const sync = await syncTransactions.mutateAsync(result.plaid_item_id);
         toast.success(`Synced ${sync.added} transaction(s).`);
+
+        // Auto-classify uncategorized transactions
+        try {
+          const ai = await classifyTransactions.mutateAsync();
+          if (ai.classified > 0) {
+            toast.success(`AI classified ${ai.classified} transaction(s).`);
+          }
+        } catch {
+          // Non-critical — don't block the flow
+        }
       } catch (err) {
         toast.error(`Connection failed: ${err instanceof Error ? err.message : err}`);
       } finally {
         onDone();
       }
     },
-    [currentHouseholdId, exchangeToken, syncTransactions, onDone]
+    [currentHouseholdId, exchangeToken, syncTransactions, classifyTransactions, onDone]
   );
 
   const onExit = useCallback(() => {
@@ -406,6 +421,7 @@ function PlaidLinkWidget({
 function SyncAllButton() {
   const { data: plaidItems } = usePlaidItems();
   const syncTransactions = useSyncTransactions();
+  const classifyTxns = useClassifyTransactions();
   const [syncing, setSyncing] = useState(false);
 
   async function handleSync() {
@@ -426,6 +442,16 @@ function SyncAllButton() {
       } catch {
         errors++;
       }
+    }
+
+    // Auto-classify uncategorized transactions after sync
+    try {
+      const ai = await classifyTxns.mutateAsync();
+      if (ai.classified > 0) {
+        toast.success(`AI classified ${ai.classified} transaction(s).`);
+      }
+    } catch {
+      // Non-critical
     }
 
     setSyncing(false);

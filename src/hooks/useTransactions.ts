@@ -11,6 +11,7 @@ import {
   deleteTransactions,
   type TransactionFilters,
 } from "@/services/transactions";
+import { classifyTransactions } from "@/services/ai";
 import type { InsertTables, UpdateTables } from "@/types/database";
 import { useHousehold } from "./useHousehold";
 
@@ -104,6 +105,24 @@ export function useDeleteTransactions() {
 
   return useMutation({
     mutationFn: (ids: string[]) => deleteTransactions(ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["spending-by-category"] });
+      queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
+    },
+  });
+}
+
+export function useClassifyTransactions() {
+  const queryClient = useQueryClient();
+  const { currentHouseholdId } = useHousehold();
+
+  return useMutation({
+    mutationFn: () => {
+      if (!currentHouseholdId) throw new Error("No household selected");
+      return classifyTransactions(currentHouseholdId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });

@@ -7,6 +7,8 @@ import {
   Trash2,
   Scissors,
   X,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +43,7 @@ import {
   useTransactions,
   useUpdateTransaction,
   useDeleteTransactions,
+  useClassifyTransactions,
 } from "@/hooks/useTransactions";
 import { useCategories } from "@/hooks/useCategories";
 import { useAccounts } from "@/hooks/useAccounts";
@@ -87,6 +90,7 @@ export function Component() {
   const { data: accounts } = useAccounts();
   const updateTxn = useUpdateTransaction();
   const deleteTxns = useDeleteTransactions();
+  const classifyTxns = useClassifyTransactions();
 
   const transactions = result?.data ?? [];
   const totalCount = result?.count ?? 0;
@@ -114,13 +118,31 @@ export function Component() {
     try {
       await Promise.all(
         ids.map((id) =>
-          updateTxn.mutateAsync({ id, data: { category_id: categoryId } })
+          updateTxn.mutateAsync({
+            id,
+            data: { category_id: categoryId, classified_by: "user" },
+          })
         )
       );
       toast.success(`Updated ${ids.length} transactions`);
       setSelected(new Set());
     } catch {
       toast.error("Failed to update transactions");
+    }
+  }
+
+  async function handleClassify() {
+    try {
+      const result = await classifyTxns.mutateAsync();
+      if (result.classified === 0) {
+        toast.info("No uncategorized transactions to classify.");
+      } else {
+        toast.success(
+          `Classified ${result.classified} transaction(s).${result.skipped ? ` ${result.skipped} skipped.` : ""}${result.errors ? ` ${result.errors} error(s).` : ""}`
+        );
+      }
+    } catch {
+      toast.error("Failed to classify transactions");
     }
   }
 
@@ -153,6 +175,19 @@ export function Component() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Transactions</h1>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleClassify}
+            disabled={classifyTxns.isPending}
+          >
+            {classifyTxns.isPending ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 mr-1" />
+            )}
+            Classify
+          </Button>
           <CSVImportDialog />
           <div data-add-transaction>
             <AddTransactionDialog />
@@ -339,11 +374,23 @@ export function Component() {
                         <span className="text-sm font-medium truncate max-w-[200px]">
                           {txn.merchant_name ?? txn.name}
                         </span>
-                        {txn.ai_category_confidence != null &&
-                          txn.ai_category_confidence > 0 && (
-                            <span className="text-xs" title="AI classified">
-                              ✨
-                            </span>
+                        {txn.classified_by === "ai" &&
+                          txn.ai_category_confidence != null && (
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-[10px] h-4 gap-0.5",
+                                txn.ai_category_confidence >= 0.8
+                                  ? "border-green-500/50 text-green-600"
+                                  : txn.ai_category_confidence >= 0.5
+                                    ? "border-yellow-500/50 text-yellow-600"
+                                    : "border-red-500/50 text-red-600"
+                              )}
+                              title={`AI confidence: ${Math.round(txn.ai_category_confidence * 100)}%`}
+                            >
+                              <Sparkles className="h-2.5 w-2.5" />
+                              {Math.round(txn.ai_category_confidence * 100)}%
+                            </Badge>
                           )}
                         {txn.source !== "manual" && txn.source !== "plaid" && (
                           <Badge variant="outline" className="text-[10px] h-4">
@@ -443,7 +490,10 @@ function InlineCategorySelect({
         try {
           await updateTxn.mutateAsync({
             id: transaction.id,
-            data: { category_id: value || null },
+            data: {
+              category_id: value || null,
+              classified_by: value ? "user" : null,
+            },
           });
         } catch {
           toast.error("Failed to update category");

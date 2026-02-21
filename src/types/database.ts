@@ -291,6 +291,7 @@ export interface Database {
           notes: string | null;
           source: "plaid" | "manual" | "csv" | "ofx" | "email" | "receipt";
           ai_category_confidence: number | null;
+          classified_by: "user" | "ai" | "plaid" | null;
           is_split: boolean;
           parent_transaction_id: string | null;
           import_hash: string | null;
@@ -310,6 +311,7 @@ export interface Database {
           notes?: string | null;
           source: "plaid" | "manual" | "csv" | "ofx" | "email" | "receipt";
           ai_category_confidence?: number | null;
+          classified_by?: "user" | "ai" | "plaid" | null;
           is_split?: boolean;
           parent_transaction_id?: string | null;
           import_hash?: string | null;
@@ -329,6 +331,7 @@ export interface Database {
           notes?: string | null;
           source?: "plaid" | "manual" | "csv" | "ofx" | "email" | "receipt";
           ai_category_confidence?: number | null;
+          classified_by?: "user" | "ai" | "plaid" | null;
           is_split?: boolean;
           parent_transaction_id?: string | null;
           import_hash?: string | null;
