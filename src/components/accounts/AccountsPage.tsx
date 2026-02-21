@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Landmark,
   CreditCard,
@@ -8,7 +8,9 @@ import {
   Eye,
   EyeOff,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
+import { usePlaidLink } from "react-plaid-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,6 +38,12 @@ import {
   useUpdateAccount,
 } from "@/hooks/useAccounts";
 import { useHousehold } from "@/hooks/useHousehold";
+import {
+  usePlaidItems,
+  useCreateLinkToken,
+  useExchangePublicToken,
+  useSyncTransactions,
+} from "@/hooks/usePlaid";
 import { formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -53,7 +61,9 @@ const ACCOUNT_TYPE_META: Record<
 export function Component() {
   const { data: accounts, isLoading } = useAccounts();
   const { data: summary, isLoading: summaryLoading } = useAccountBalanceSummary();
+  const { currentRole } = useHousehold();
   const updateAccount = useUpdateAccount();
+  const canManagePlaid = currentRole === "owner" || currentRole === "admin";
 
   const visibleAccounts = accounts?.filter((a) => !a.is_hidden) ?? [];
   const hiddenAccounts = accounts?.filter((a) => a.is_hidden) ?? [];
@@ -74,7 +84,8 @@ export function Component() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Accounts</h1>
         <div className="flex items-center gap-2">
-          <PlaidConnectButton />
+          {canManagePlaid && <SyncAllButton />}
+          {canManagePlaid && <PlaidConnectButton />}
           <AddManualAccountDialog />
         </div>
       </div>
@@ -295,40 +306,148 @@ function BalanceCard({
 }
 
 function PlaidConnectButton() {
-  // Plaid Link requires a link_token from a backend endpoint.
-  // This button opens a placeholder that explains the setup needed.
-  const [showInfo, setShowInfo] = useState(false);
+  const { currentHouseholdId } = useHousehold();
+  const createLinkToken = useCreateLinkToken();
+  const exchangeToken = useExchangePublicToken();
+  const syncTransactions = useSyncTransactions();
+  const [linkToken, setLinkToken] = useState<string | null>(null);
+
+  async function handleClick() {
+    if (!currentHouseholdId) return;
+    try {
+      const { link_token } = await createLinkToken.mutateAsync(currentHouseholdId);
+      setLinkToken(link_token);
+    } catch (err) {
+      toast.error(`Failed to start bank connection: ${err instanceof Error ? err.message : err}`);
+    }
+  }
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={() => setShowInfo(true)}>
-        <RefreshCw className="h-4 w-4 mr-1" />
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleClick}
+        disabled={createLinkToken.isPending}
+      >
+        {createLinkToken.isPending ? (
+          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+        ) : (
+          <Plus className="h-4 w-4 mr-1" />
+        )}
         Connect Bank
       </Button>
-      <Dialog open={showInfo} onOpenChange={setShowInfo}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Connect Bank via Plaid</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <p>
-              To connect your bank accounts, you need to configure a Plaid Link
-              token endpoint via Supabase Edge Functions.
-            </p>
-            <p>Required environment variables:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li><code>PLAID_CLIENT_ID</code></li>
-              <li><code>PLAID_SECRET</code></li>
-              <li><code>PLAID_ENV</code> (sandbox / development / production)</li>
-            </ul>
-            <p>
-              Once configured, the Plaid Link widget will open here to securely
-              connect your bank accounts.
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {linkToken && (
+        <PlaidLinkWidget
+          linkToken={linkToken}
+          onDone={() => setLinkToken(null)}
+          exchangeToken={exchangeToken}
+          syncTransactions={syncTransactions}
+        />
+      )}
     </>
+  );
+}
+
+function PlaidLinkWidget({
+  linkToken,
+  onDone,
+  exchangeToken,
+  syncTransactions,
+}: {
+  linkToken: string;
+  onDone: () => void;
+  exchangeToken: ReturnType<typeof useExchangePublicToken>;
+  syncTransactions: ReturnType<typeof useSyncTransactions>;
+}) {
+  const { currentHouseholdId } = useHousehold();
+
+  const onSuccess = useCallback(
+    async (publicToken: string, metadata: { institution: { name: string; institution_id: string } | null }) => {
+      if (!currentHouseholdId) return;
+      try {
+        toast.info("Connecting your bank...");
+        const result = await exchangeToken.mutateAsync({
+          publicToken,
+          householdId: currentHouseholdId,
+          institution: metadata.institution ?? { name: "Unknown", institution_id: "" },
+        });
+        toast.success(`Connected! ${result.accounts_created} account(s) linked.`);
+
+        toast.info("Syncing transactions...");
+        const sync = await syncTransactions.mutateAsync(result.plaid_item_id);
+        toast.success(`Synced ${sync.added} transaction(s).`);
+      } catch (err) {
+        toast.error(`Connection failed: ${err instanceof Error ? err.message : err}`);
+      } finally {
+        onDone();
+      }
+    },
+    [currentHouseholdId, exchangeToken, syncTransactions, onDone]
+  );
+
+  const onExit = useCallback(() => {
+    onDone();
+  }, [onDone]);
+
+  const { open, ready } = usePlaidLink({
+    token: linkToken,
+    onSuccess,
+    onExit,
+  });
+
+  useEffect(() => {
+    if (ready) open();
+  }, [ready, open]);
+
+  return null;
+}
+
+function SyncAllButton() {
+  const { data: plaidItems } = usePlaidItems();
+  const syncTransactions = useSyncTransactions();
+  const [syncing, setSyncing] = useState(false);
+
+  async function handleSync() {
+    if (!plaidItems?.length) {
+      toast.info("No connected banks to sync.");
+      return;
+    }
+    setSyncing(true);
+    let totalAdded = 0;
+    let totalModified = 0;
+    let errors = 0;
+
+    for (const item of plaidItems) {
+      try {
+        const result = await syncTransactions.mutateAsync(item.id);
+        totalAdded += result.added;
+        totalModified += result.modified;
+      } catch {
+        errors++;
+      }
+    }
+
+    setSyncing(false);
+
+    if (errors > 0) {
+      toast.warning(`Synced with ${errors} error(s). ${totalAdded} added, ${totalModified} modified.`);
+    } else {
+      toast.success(`Sync complete: ${totalAdded} added, ${totalModified} modified.`);
+    }
+  }
+
+  if (!plaidItems?.length) return null;
+
+  return (
+    <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+      {syncing ? (
+        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+      ) : (
+        <RefreshCw className="h-4 w-4 mr-1" />
+      )}
+      Sync All
+    </Button>
   );
 }
 
