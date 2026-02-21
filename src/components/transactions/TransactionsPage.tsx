@@ -487,12 +487,14 @@ function InlineCategorySelect({
     <Select
       value={transaction.category_id ?? ""}
       onValueChange={async (value) => {
+        const cleared = value === "__uncategorized__";
         try {
           await updateTxn.mutateAsync({
             id: transaction.id,
             data: {
-              category_id: value || null,
-              classified_by: value ? "user" : null,
+              category_id: cleared ? null : value,
+              classified_by: cleared ? null : "user",
+              ai_category_confidence: cleared ? null : undefined,
             },
           });
         } catch {
@@ -518,6 +520,9 @@ function InlineCategorySelect({
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
+        <SelectItem value="__uncategorized__">
+          <span className="text-muted-foreground">Uncategorized</span>
+        </SelectItem>
         {categories.map((c) => (
           <SelectItem key={c.id} value={c.id}>
             <div className="flex items-center gap-1.5">
