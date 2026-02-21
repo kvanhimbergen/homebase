@@ -1,6 +1,10 @@
 import { supabase } from "@/lib/supabase";
 import { eachMonthOfInterval, format, parseISO, startOfMonth } from "date-fns";
 import type { Tables, InsertTables, UpdateTables } from "@/types/database";
+import type { TransactionSource } from "@/lib/constants";
+
+export type SortField = "date" | "amount" | "name";
+export type SortDirection = "asc" | "desc";
 
 export interface TransactionFilters {
   householdId: string;
@@ -9,17 +13,31 @@ export interface TransactionFilters {
   categoryId?: string;
   startDate?: string;
   endDate?: string;
+  sortBy?: SortField;
+  sortDirection?: SortDirection;
+  source?: TransactionSource;
+  classifiedBy?: "user" | "ai" | "plaid" | "none";
+  minAmount?: number;
+  maxAmount?: number;
   limit?: number;
   offset?: number;
 }
 
 export async function getTransactions(filters: TransactionFilters) {
+  const sortBy = filters.sortBy ?? "date";
+  const ascending = (filters.sortDirection ?? "desc") === "asc";
+
   let query = supabase
     .from("transactions")
     .select("*, categories(*), accounts(*)", { count: "exact" })
     .eq("household_id", filters.householdId)
     .eq("is_split", false)
-    .order("date", { ascending: false });
+    .order(sortBy, { ascending });
+
+  // Secondary sort: when sorting by amount or name, add date desc as tiebreaker
+  if (sortBy !== "date") {
+    query = query.order("date", { ascending: false });
+  }
 
   if (filters.search) {
     query = query.or(
@@ -37,6 +55,22 @@ export async function getTransactions(filters: TransactionFilters) {
   }
   if (filters.endDate) {
     query = query.lte("date", filters.endDate);
+  }
+  if (filters.source) {
+    query = query.eq("source", filters.source);
+  }
+  if (filters.classifiedBy) {
+    if (filters.classifiedBy === "none") {
+      query = query.is("category_id", null);
+    } else {
+      query = query.eq("classified_by", filters.classifiedBy);
+    }
+  }
+  if (filters.minAmount != null) {
+    query = query.gte("amount", filters.minAmount);
+  }
+  if (filters.maxAmount != null) {
+    query = query.lte("amount", filters.maxAmount);
   }
   if (filters.limit) {
     query = query.limit(filters.limit);

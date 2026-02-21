@@ -9,6 +9,9 @@ import {
   X,
   Sparkles,
   Loader2,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,6 +52,8 @@ import { useCategories } from "@/hooks/useCategories";
 import { useAccounts } from "@/hooks/useAccounts";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import { TRANSACTION_SOURCES, type TransactionSource } from "@/lib/constants";
+import type { SortField, SortDirection } from "@/services/transactions";
 import type { Tables } from "@/types/database";
 import { toast } from "sonner";
 
@@ -66,6 +71,12 @@ export function Component() {
     format(subMonths(new Date(), 3), "yyyy-MM-dd")
   );
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [sortBy, setSortBy] = useState<SortField>("date");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [sourceFilter, setSourceFilter] = useState("");
+  const [classifiedByFilter, setClassifiedByFilter] = useState("");
+  const [minAmount, setMinAmount] = useState("");
+  const [maxAmount, setMaxAmount] = useState("");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [splitTxn, setSplitTxn] = useState<Tables<"transactions"> | null>(null);
@@ -76,12 +87,26 @@ export function Component() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  // Reset to first page when any filter or sort changes
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, categoryFilter, accountFilter, startDate, endDate, sortBy, sortDirection, sourceFilter, classifiedByFilter, minAmount, maxAmount]);
+
+  const parsedMin = minAmount !== "" ? parseFloat(minAmount) : undefined;
+  const parsedMax = maxAmount !== "" ? parseFloat(maxAmount) : undefined;
+
   const { data: result, isLoading } = useTransactions({
     search: debouncedSearch || undefined,
     categoryId: categoryFilter || undefined,
     accountId: accountFilter || undefined,
     startDate,
     endDate,
+    sortBy,
+    sortDirection,
+    source: (sourceFilter as TransactionSource) || undefined,
+    classifiedBy: (classifiedByFilter as "user" | "ai" | "plaid" | "none") || undefined,
+    minAmount: parsedMin != null && !isNaN(parsedMin) ? parsedMin : undefined,
+    maxAmount: parsedMax != null && !isNaN(parsedMax) ? parsedMax : undefined,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
   });
@@ -248,6 +273,35 @@ export function Component() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="w-36">
+                <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="All sources" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All sources</SelectItem>
+                    {TRANSACTION_SOURCES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s.charAt(0).toUpperCase() + s.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-44">
+                <Select value={classifiedByFilter} onValueChange={setClassifiedByFilter}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All statuses</SelectItem>
+                    <SelectItem value="ai">AI classified</SelectItem>
+                    <SelectItem value="user">User classified</SelectItem>
+                    <SelectItem value="plaid">Plaid classified</SelectItem>
+                    <SelectItem value="none">Uncategorized</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <Input
                 type="date"
                 value={startDate}
@@ -261,14 +315,34 @@ export function Component() {
                 onChange={(e) => setEndDate(e.target.value)}
                 className="w-36 h-9 text-sm"
               />
+              <Input
+                type="number"
+                placeholder="Min $"
+                value={minAmount}
+                onChange={(e) => setMinAmount(e.target.value)}
+                className="w-24 h-9 text-sm"
+              />
+              <Input
+                type="number"
+                placeholder="Max $"
+                value={maxAmount}
+                onChange={(e) => setMaxAmount(e.target.value)}
+                className="w-24 h-9 text-sm"
+              />
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
                   setCategoryFilter("");
                   setAccountFilter("");
+                  setSourceFilter("");
+                  setClassifiedByFilter("");
+                  setMinAmount("");
+                  setMaxAmount("");
                   setStartDate(format(subMonths(new Date(), 3), "yyyy-MM-dd"));
                   setEndDate(format(new Date(), "yyyy-MM-dd"));
+                  setSortBy("date");
+                  setSortDirection("desc");
                 }}
               >
                 <X className="h-3 w-3 mr-1" /> Clear
@@ -328,11 +402,36 @@ export function Component() {
                     onCheckedChange={toggleAll}
                   />
                 </TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Description</TableHead>
+                <TableHead>
+                  <SortableHeader
+                    label="Date"
+                    field="date"
+                    currentSort={sortBy}
+                    currentDirection={sortDirection}
+                    onSort={(field, dir) => { setSortBy(field); setSortDirection(dir); }}
+                  />
+                </TableHead>
+                <TableHead>
+                  <SortableHeader
+                    label="Description"
+                    field="name"
+                    currentSort={sortBy}
+                    currentDirection={sortDirection}
+                    onSort={(field, dir) => { setSortBy(field); setSortDirection(dir); }}
+                  />
+                </TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Account</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader
+                    label="Amount"
+                    field="amount"
+                    currentSort={sortBy}
+                    currentDirection={sortDirection}
+                    onSort={(field, dir) => { setSortBy(field); setSortDirection(dir); }}
+                    className="justify-end"
+                  />
+                </TableHead>
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
@@ -471,6 +570,52 @@ export function Component() {
         />
       )}
     </div>
+  );
+}
+
+function SortableHeader({
+  label,
+  field,
+  currentSort,
+  currentDirection,
+  onSort,
+  className,
+}: {
+  label: string;
+  field: SortField;
+  currentSort: SortField;
+  currentDirection: SortDirection;
+  onSort: (field: SortField, direction: SortDirection) => void;
+  className?: string;
+}) {
+  const isActive = currentSort === field;
+
+  return (
+    <button
+      className={cn(
+        "inline-flex items-center gap-1 hover:text-foreground transition-colors -my-1",
+        isActive ? "text-foreground" : "text-muted-foreground",
+        className
+      )}
+      onClick={() => {
+        if (isActive) {
+          onSort(field, currentDirection === "asc" ? "desc" : "asc");
+        } else {
+          onSort(field, field === "name" ? "asc" : "desc");
+        }
+      }}
+    >
+      {label}
+      {isActive ? (
+        currentDirection === "asc" ? (
+          <ArrowUp className="h-3.5 w-3.5" />
+        ) : (
+          <ArrowDown className="h-3.5 w-3.5" />
+        )
+      ) : (
+        <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />
+      )}
+    </button>
   );
 }
 
