@@ -21,9 +21,20 @@ async function invokeFn<T>(
     body: JSON.stringify(body),
   });
 
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? `${fnName} failed`);
-  return data as T;
+  const text = await res.text();
+  if (!res.ok) {
+    let msg = `${fnName}: ${res.status}`;
+    try {
+      const json = JSON.parse(text);
+      if (json.error) msg = json.error;
+      else if (json.msg) msg = json.msg;
+    } catch {
+      if (text) msg = `${fnName}: ${text.slice(0, 200)}`;
+    }
+    throw new Error(msg);
+  }
+
+  return JSON.parse(text) as T;
 }
 
 export async function createLinkToken(householdId: string) {
