@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
       .select("id, name, merchant_name, amount, date")
       .eq("household_id", household_id)
       .is("category_id", null)
-      .neq("classified_by", "user")
+      .or("classified_by.is.null,classified_by.neq.user")
       .order("date", { ascending: false })
       .limit(500);
 
