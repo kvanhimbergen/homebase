@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { format, subMonths } from "date-fns";
 import {
   Search,
@@ -51,9 +52,12 @@ import { toast } from "sonner";
 const PAGE_SIZE = 50;
 
 export function Component() {
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState(
+    searchParams.get("categoryId") ?? ""
+  );
   const [accountFilter, setAccountFilter] = useState("");
   const [startDate, setStartDate] = useState(
     format(subMonths(new Date(), 3), "yyyy-MM-dd")
@@ -62,7 +66,7 @@ export function Component() {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [splitTxn, setSplitTxn] = useState<Tables<"transactions"> | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(!!searchParams.get("categoryId"));
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);

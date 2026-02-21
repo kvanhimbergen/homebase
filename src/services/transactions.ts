@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { eachMonthOfInterval, format, parseISO, startOfMonth } from "date-fns";
 import type { Tables, InsertTables, UpdateTables } from "@/types/database";
 
 export interface TransactionFilters {
@@ -136,4 +137,52 @@ export async function getCashFlow(
     .reduce((sum, t) => sum + t.amount, 0);
 
   return { income, expenses, net: income - expenses };
+}
+
+export interface MonthCashFlow {
+  month: string;
+  income: number;
+  expenses: number;
+}
+
+export async function getMultiMonthCashFlow(
+  householdId: string,
+  start: string,
+  end: string
+): Promise<MonthCashFlow[]> {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("date, amount")
+    .eq("household_id", householdId)
+    .eq("is_split", false)
+    .gte("date", start)
+    .lte("date", end);
+
+  if (error) throw error;
+
+  const startDate = parseISO(start);
+  const endDate = parseISO(end);
+  const months = eachMonthOfInterval({ start: startDate, end: endDate });
+
+  const buckets = new Map<string, { income: number; expenses: number }>();
+  for (const m of months) {
+    buckets.set(format(m, "MMM yyyy"), { income: 0, expenses: 0 });
+  }
+
+  for (const txn of data) {
+    const key = format(startOfMonth(parseISO(txn.date)), "MMM yyyy");
+    const bucket = buckets.get(key);
+    if (!bucket) continue;
+    if (txn.amount < 0) {
+      bucket.income += Math.abs(txn.amount);
+    } else {
+      bucket.expenses += txn.amount;
+    }
+  }
+
+  return months.map((m) => {
+    const key = format(m, "MMM yyyy");
+    const bucket = buckets.get(key)!;
+    return { month: format(m, "MMM"), income: bucket.income, expenses: bucket.expenses };
+  });
 }

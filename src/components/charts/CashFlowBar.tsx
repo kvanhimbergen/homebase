@@ -16,9 +16,15 @@ interface CashFlowDataPoint {
   expenses: number;
 }
 
-export function CashFlowBar({ data }: { data: CashFlowDataPoint[] }) {
+export function CashFlowBar({
+  data,
+  height = 300,
+}: {
+  data: CashFlowDataPoint[];
+  height?: number;
+}) {
   return (
-    <ResponsiveContainer width="100%" height={300}>
+    <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} barCategoryGap="20%">
         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
         <XAxis

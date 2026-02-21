@@ -1,36 +1,74 @@
 import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Landmark,
+  PiggyBank,
+  CreditCard,
+  LineChart,
+  ArrowRight,
+  Wallet,
+  BarChart3,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { SpendingDonut, SpendingLegend } from "@/components/charts/SpendingDonut";
+import { CashFlowBar } from "@/components/charts/CashFlowBar";
 import {
   useRecentTransactions,
   useSpendingByCategory,
   useCashFlow,
+  useMultiMonthCashFlow,
 } from "@/hooks/useTransactions";
+import { useAccountBalanceSummary } from "@/hooks/useAccounts";
 import { useBudgets } from "@/hooks/useBudgets";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
 export function Component() {
+  const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const start = format(startOfMonth(currentDate), "yyyy-MM-dd");
   const end = format(endOfMonth(currentDate), "yyyy-MM-dd");
 
+  // Previous month for delta calculation
+  const prevStart = format(startOfMonth(subMonths(currentDate, 1)), "yyyy-MM-dd");
+  const prevEnd = format(endOfMonth(subMonths(currentDate, 1)), "yyyy-MM-dd");
+
   const { data: spending, isLoading: spendingLoading } = useSpendingByCategory(start, end);
   const { data: cashFlow, isLoading: cashFlowLoading } = useCashFlow(start, end);
+  const { data: prevCashFlow } = useCashFlow(prevStart, prevEnd);
   const { data: recentTxns, isLoading: txnsLoading } = useRecentTransactions(8);
   const { data: budgets, isLoading: budgetsLoading } = useBudgets();
+  const { data: balances, isLoading: balancesLoading } = useAccountBalanceSummary();
+  const { data: multiMonthData, isLoading: multiMonthLoading } = useMultiMonthCashFlow(currentDate, 6);
 
   const totalSpent = spending?.reduce((sum, s) => sum + Math.abs(s.total), 0) ?? 0;
 
+  function calcDelta(current: number, previous: number): number | null {
+    if (previous === 0) return null;
+    return ((current - previous) / previous) * 100;
+  }
+
+  const incomeDelta = prevCashFlow ? calcDelta(cashFlow?.income ?? 0, prevCashFlow.income) : null;
+  const expenseDelta = prevCashFlow ? calcDelta(cashFlow?.expenses ?? 0, prevCashFlow.expenses) : null;
+  const netDelta = prevCashFlow ? calcDelta(cashFlow?.net ?? 0, prevCashFlow.net) : null;
+
+  function handleCategoryClick(categoryId: string) {
+    navigate(`/transactions?categoryId=${categoryId}`);
+  }
+
   return (
     <div className="space-y-6">
-      {/* Month Selector */}
+      {/* Header + Month Selector */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <div className="flex items-center gap-2">
@@ -56,7 +94,10 @@ export function Component() {
         </div>
       </div>
 
-      {/* Cash Flow Cards */}
+      {/* Net Worth Banner */}
+      <AccountBalanceBanner balances={balances} loading={balancesLoading} />
+
+      {/* Cash Flow Cards with Deltas */}
       <div className="grid gap-4 md:grid-cols-3">
         <CashFlowCard
           title="Income"
@@ -64,6 +105,8 @@ export function Component() {
           icon={<TrendingUp className="h-4 w-4" />}
           className="text-income"
           loading={cashFlowLoading}
+          delta={incomeDelta}
+          deltaInverted={false}
         />
         <CashFlowCard
           title="Expenses"
@@ -71,6 +114,8 @@ export function Component() {
           icon={<TrendingDown className="h-4 w-4" />}
           className="text-expense"
           loading={cashFlowLoading}
+          delta={expenseDelta}
+          deltaInverted={true}
         />
         <CashFlowCard
           title="Net"
@@ -78,11 +123,36 @@ export function Component() {
           icon={<DollarSign className="h-4 w-4" />}
           className={(cashFlow?.net ?? 0) >= 0 ? "text-income" : "text-expense"}
           loading={cashFlowLoading}
+          delta={netDelta}
+          deltaInverted={false}
         />
       </div>
 
+      {/* Cash Flow Bar Chart + Spending Donut */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Spending by Category */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Cash Flow Trend</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {multiMonthLoading ? (
+              <Skeleton className="h-[300px] w-full" />
+            ) : multiMonthData && multiMonthData.length > 0 ? (
+              <CashFlowBar data={multiMonthData} height={300} />
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <BarChart3 className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                <p className="text-sm text-muted-foreground">
+                  No cash flow data available.
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Add transactions to see your cash flow trend.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Spending by Category</CardTitle>
@@ -99,9 +169,16 @@ export function Component() {
               </div>
             ) : spending && spending.length > 0 ? (
               <>
-                <SpendingDonut data={spending} total={totalSpent} />
+                <SpendingDonut
+                  data={spending}
+                  total={totalSpent}
+                  onCategoryClick={handleCategoryClick}
+                />
                 <div className="mt-4">
-                  <SpendingLegend data={spending} />
+                  <SpendingLegend
+                    data={spending}
+                    onCategoryClick={handleCategoryClick}
+                  />
                 </div>
               </>
             ) : (
@@ -117,8 +194,10 @@ export function Component() {
             )}
           </CardContent>
         </Card>
+      </div>
 
-        {/* Budget Progress */}
+      {/* Budget Progress + Recent Transactions */}
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Budget Progress</CardTitle>
@@ -180,6 +259,7 @@ export function Component() {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Wallet className="h-12 w-12 text-muted-foreground/30 mb-3" />
                 <p className="text-sm text-muted-foreground">
                   No budgets set up yet.
                 </p>
@@ -190,87 +270,181 @@ export function Component() {
             )}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Recent Transactions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent Transactions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {txnsLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <div className="flex-1 space-y-1">
-                    <Skeleton className="h-4 w-1/3" />
-                    <Skeleton className="h-3 w-1/4" />
-                  </div>
-                  <Skeleton className="h-4 w-20" />
-                </div>
-              ))}
-            </div>
-          ) : recentTxns && recentTxns.length > 0 ? (
-            <div className="space-y-1">
-              {recentTxns.map((txn) => (
-                <div
-                  key={txn.id}
-                  className="flex items-center gap-4 py-2.5 px-2 rounded-md hover:bg-muted/50 transition-colors"
-                >
-                  <div
-                    className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-medium text-white shrink-0"
-                    style={{
-                      backgroundColor: txn.categories?.color ?? "#64748b",
-                    }}
-                  >
-                    {(txn.merchant_name ?? txn.name).charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {txn.merchant_name ?? txn.name}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        {formatDate(txn.date)}
-                      </span>
-                      {txn.categories && (
-                        <Badge variant="secondary" className="text-xs h-5">
-                          {txn.categories.name}
-                        </Badge>
-                      )}
-                      {txn.ai_category_confidence != null &&
-                        txn.ai_category_confidence > 0 && (
-                          <span className="text-xs" title="AI classified">
-                            ✨
-                          </span>
-                        )}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base">Recent Transactions</CardTitle>
+            <Button variant="ghost" size="sm" className="text-xs" asChild>
+              <Link to="/transactions">
+                View All <ArrowRight className="h-3 w-3 ml-1" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {txnsLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <div className="flex-1 space-y-1">
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-3 w-1/4" />
                     </div>
+                    <Skeleton className="h-4 w-20" />
                   </div>
-                  <span
-                    className={cn(
-                      "text-sm font-medium tabular-nums",
-                      txn.amount < 0 ? "text-income" : "text-foreground"
-                    )}
+                ))}
+              </div>
+            ) : recentTxns && recentTxns.length > 0 ? (
+              <div className="space-y-1">
+                {recentTxns.map((txn) => (
+                  <div
+                    key={txn.id}
+                    className="flex items-center gap-4 py-2.5 px-2 rounded-md hover:bg-muted/50 transition-colors"
                   >
-                    {txn.amount < 0 ? "+" : "-"}
-                    {formatCurrency(Math.abs(txn.amount))}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <p className="text-sm text-muted-foreground">
-                No transactions yet.
+                    <div
+                      className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-medium text-white shrink-0"
+                      style={{
+                        backgroundColor: txn.categories?.color ?? "#64748b",
+                      }}
+                    >
+                      {(txn.merchant_name ?? txn.name).charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {txn.merchant_name ?? txn.name}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {formatDate(txn.date)}
+                        </span>
+                        {txn.categories && (
+                          <Badge variant="secondary" className="text-xs h-5">
+                            {txn.categories.name}
+                          </Badge>
+                        )}
+                        {txn.ai_category_confidence != null &&
+                          txn.ai_category_confidence > 0 && (
+                            <span className="text-xs" title="AI classified">
+                              ✨
+                            </span>
+                          )}
+                      </div>
+                    </div>
+                    <span
+                      className={cn(
+                        "text-sm font-medium tabular-nums",
+                        txn.amount < 0 ? "text-income" : "text-foreground"
+                      )}
+                    >
+                      {txn.amount < 0 ? "+" : "-"}
+                      {formatCurrency(Math.abs(txn.amount))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <DollarSign className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                <p className="text-sm text-muted-foreground">
+                  No transactions yet.
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Add transactions manually or connect a bank account.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ── Sub-components ─────────────────────────────────────────────── */
+
+function AccountBalanceBanner({
+  balances,
+  loading,
+}: {
+  balances:
+    | { netWorth: number; checking: number; savings: number; credit: number; investment: number }
+    | undefined;
+  loading: boolean;
+}) {
+  return (
+    <Card className="bg-gradient-to-r from-slate-900 to-slate-800 text-white border-0">
+      <CardContent className="pt-6 pb-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm text-slate-300 mb-1">Net Worth</p>
+            {loading ? (
+              <Skeleton className="h-9 w-40 bg-slate-700" />
+            ) : (
+              <p className="text-3xl font-bold">
+                {formatCurrency(balances?.netWorth ?? 0)}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Add transactions manually or connect a bank account.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <BalanceMiniCard
+              icon={<Landmark className="h-4 w-4" />}
+              label="Checking"
+              amount={balances?.checking ?? 0}
+              loading={loading}
+            />
+            <BalanceMiniCard
+              icon={<PiggyBank className="h-4 w-4" />}
+              label="Savings"
+              amount={balances?.savings ?? 0}
+              loading={loading}
+            />
+            <BalanceMiniCard
+              icon={<CreditCard className="h-4 w-4" />}
+              label="Credit"
+              amount={balances?.credit ?? 0}
+              loading={loading}
+              negative
+            />
+            <BalanceMiniCard
+              icon={<LineChart className="h-4 w-4" />}
+              label="Investments"
+              amount={balances?.investment ?? 0}
+              loading={loading}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BalanceMiniCard({
+  icon,
+  label,
+  amount,
+  loading,
+  negative,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  amount: number;
+  loading: boolean;
+  negative?: boolean;
+}) {
+  return (
+    <div className="bg-white/10 rounded-lg px-3 py-2 min-w-[130px]">
+      <div className="flex items-center gap-1.5 mb-1 text-slate-300">
+        {icon}
+        <span className="text-xs">{label}</span>
+      </div>
+      {loading ? (
+        <Skeleton className="h-5 w-16 bg-slate-700" />
+      ) : (
+        <p className="text-sm font-semibold tabular-nums">
+          {negative && amount > 0 ? "-" : ""}
+          {formatCurrency(Math.abs(amount))}
+        </p>
+      )}
     </div>
   );
 }
@@ -281,12 +455,16 @@ function CashFlowCard({
   icon,
   className,
   loading,
+  delta,
+  deltaInverted,
 }: {
   title: string;
   amount: number;
   icon: React.ReactNode;
   className?: string;
   loading: boolean;
+  delta: number | null;
+  deltaInverted: boolean;
 }) {
   return (
     <Card>
@@ -298,11 +476,45 @@ function CashFlowCard({
         {loading ? (
           <Skeleton className="h-8 w-24" />
         ) : (
-          <p className={cn("text-2xl font-bold", className)}>
-            {formatCurrency(Math.abs(amount))}
-          </p>
+          <div className="flex items-end gap-2">
+            <p className={cn("text-2xl font-bold", className)}>
+              {formatCurrency(Math.abs(amount))}
+            </p>
+            <DeltaBadge delta={delta} inverted={deltaInverted} />
+          </div>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function DeltaBadge({
+  delta,
+  inverted,
+}: {
+  delta: number | null;
+  inverted: boolean;
+}) {
+  if (delta === null) return null;
+
+  const rounded = Math.round(delta);
+  if (rounded === 0) return null;
+
+  // For expenses, going up is bad; for income/net, going up is good
+  const isPositiveChange = delta > 0;
+  const isGood = inverted ? !isPositiveChange : isPositiveChange;
+
+  return (
+    <span
+      className={cn(
+        "text-xs font-medium px-1.5 py-0.5 rounded-md mb-0.5",
+        isGood
+          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+      )}
+    >
+      {delta > 0 ? "+" : ""}
+      {rounded}%
+    </span>
   );
 }

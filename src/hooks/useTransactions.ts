@@ -1,9 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import {
   getTransactions,
   getRecentTransactions,
   getSpendingByCategory,
   getCashFlow,
+  getMultiMonthCashFlow,
   createTransaction,
   updateTransaction,
   deleteTransactions,
@@ -51,6 +53,18 @@ export function useCashFlow(start: string, end: string) {
   return useQuery({
     queryKey: ["cash-flow", currentHouseholdId, start, end],
     queryFn: () => getCashFlow(currentHouseholdId!, start, end),
+    enabled: !!currentHouseholdId,
+  });
+}
+
+export function useMultiMonthCashFlow(currentDate: Date, monthsBack = 6) {
+  const { currentHouseholdId } = useHousehold();
+  const end = format(endOfMonth(currentDate), "yyyy-MM-dd");
+  const start = format(startOfMonth(subMonths(currentDate, monthsBack - 1)), "yyyy-MM-dd");
+
+  return useQuery({
+    queryKey: ["multi-month-cash-flow", currentHouseholdId, start, end],
+    queryFn: () => getMultiMonthCashFlow(currentHouseholdId!, start, end),
     enabled: !!currentHouseholdId,
   });
 }

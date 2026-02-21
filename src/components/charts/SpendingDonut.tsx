@@ -38,14 +38,17 @@ function resolveColor(color: string | null, index: number): string {
 export function SpendingDonut({
   data,
   total,
+  onCategoryClick,
 }: {
   data: SpendingItem[];
   total: number;
+  onCategoryClick?: (categoryId: string) => void;
 }) {
   const chartData = data.map((item, i) => ({
     name: item.category_name,
     value: Math.abs(item.total),
     color: resolveColor(item.category_color, i),
+    categoryId: item.category_id,
   }));
 
   return (
@@ -61,6 +64,14 @@ export function SpendingDonut({
             paddingAngle={2}
             dataKey="value"
             strokeWidth={0}
+            style={onCategoryClick ? { cursor: "pointer" } : undefined}
+            onClick={
+              onCategoryClick
+                ? (_data, index) => {
+                    onCategoryClick(chartData[index].categoryId);
+                  }
+                : undefined
+            }
           >
             {chartData.map((entry, index) => (
               <Cell key={index} fill={entry.color} />
@@ -92,15 +103,30 @@ export function SpendingDonut({
   );
 }
 
-export function SpendingLegend({ data }: { data: SpendingItem[] }) {
+export function SpendingLegend({
+  data,
+  onCategoryClick,
+}: {
+  data: SpendingItem[];
+  onCategoryClick?: (categoryId: string) => void;
+}) {
   const total = data.reduce((sum, item) => sum + Math.abs(item.total), 0);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       {data.map((item, i) => {
         const pct = total > 0 ? (Math.abs(item.total) / total) * 100 : 0;
+        const Row = onCategoryClick ? "button" : "div";
         return (
-          <div key={item.category_id} className="flex items-center gap-3">
+          <Row
+            key={item.category_id}
+            className={`flex items-center gap-3 w-full ${
+              onCategoryClick
+                ? "rounded-md px-2 py-1.5 -mx-2 hover:bg-muted/60 transition-colors text-left cursor-pointer"
+                : ""
+            }`}
+            onClick={onCategoryClick ? () => onCategoryClick(item.category_id) : undefined}
+          >
             <div
               className="w-3 h-3 rounded-full shrink-0"
               style={{
@@ -114,7 +140,7 @@ export function SpendingLegend({ data }: { data: SpendingItem[] }) {
             <span className="text-sm font-medium tabular-nums w-24 text-right">
               {formatCurrency(Math.abs(item.total))}
             </span>
-          </div>
+          </Row>
         );
       })}
     </div>
