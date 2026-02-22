@@ -46,6 +46,7 @@ import { AddTransactionDialog } from "./AddTransactionDialog";
 import { CSVImportDialog } from "./CSVImportDialog";
 import { QFXImportDialog } from "./QFXImportDialog";
 import { SplitTransactionDialog } from "./SplitTransactionDialog";
+import { TransferMatchDialog } from "./TransferMatchDialog";
 import {
   useTransactions,
   useUpdateTransaction,
@@ -87,6 +88,7 @@ export function Component() {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [splitTxn, setSplitTxn] = useState<Tables<"transactions"> | null>(null);
+  const [matchTxn, setMatchTxn] = useState<Tables<"transactions"> | null>(null);
   const [checksOnly, setChecksOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(!!searchParams.get("categoryId"));
 
@@ -545,6 +547,19 @@ export function Component() {
               ))}
             </PopoverContent>
           </Popover>
+          {selected.size === 1 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const id = Array.from(selected)[0];
+                const txn = transactions.find((t) => t.id === id);
+                if (txn) setMatchTxn(txn);
+              }}
+            >
+              <Search className="h-3 w-3 mr-1" /> Find Match
+            </Button>
+          )}
           {selected.size === 2 && (
             <Button variant="outline" size="sm" onClick={handleMarkAsTransfer}>
               <ArrowLeftRight className="h-3 w-3 mr-1" /> Mark as Transfer
@@ -766,6 +781,19 @@ export function Component() {
           transaction={splitTxn}
           open={!!splitTxn}
           onOpenChange={(open) => !open && setSplitTxn(null)}
+        />
+      )}
+
+      {matchTxn && (
+        <TransferMatchDialog
+          transaction={matchTxn}
+          open={!!matchTxn}
+          onOpenChange={(open) => {
+            if (!open) {
+              setMatchTxn(null);
+              setSelected(new Set());
+            }
+          }}
         />
       )}
     </div>

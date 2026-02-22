@@ -11,7 +11,9 @@ import {
   deleteTransactions,
   linkTransferPair,
   unlinkTransferPair,
+  findTransferMatches,
   type TransactionFilters,
+  type TransferMatch,
 } from "@/services/transactions";
 import { classifyTransactions } from "@/services/ai";
 import type { InsertTables, UpdateTables } from "@/types/database";
@@ -144,6 +146,16 @@ export function useUnlinkTransferPair() {
       queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
       queryClient.invalidateQueries({ queryKey: ["credit-card-payments"] });
     },
+  });
+}
+
+export type { TransferMatch };
+
+export function useFindTransferMatches(txnId: string | null) {
+  return useQuery({
+    queryKey: ["transfer-matches", txnId],
+    queryFn: () => findTransferMatches(txnId!),
+    enabled: !!txnId,
   });
 }
 

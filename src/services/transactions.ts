@@ -269,6 +269,46 @@ export async function linkTransferPair(txnIdA: string, txnIdB: string) {
   if (errB) throw errB;
 }
 
+export type TransferMatch = Tables<"transactions"> & {
+  accounts: Tables<"accounts"> | null;
+};
+
+export async function findTransferMatches(
+  txnId: string
+): Promise<TransferMatch[]> {
+  // Fetch the source transaction
+  const { data: source, error: srcError } = await supabase
+    .from("transactions")
+    .select("household_id, amount, date, account_id")
+    .eq("id", txnId)
+    .single();
+  if (srcError || !source) throw srcError ?? new Error("Transaction not found");
+
+  const targetAmount = -source.amount;
+  const epsilon = 0.005;
+  const srcDate = parseISO(source.date);
+  const minDate = format(new Date(srcDate.getTime() - 7 * 86400000), "yyyy-MM-dd");
+  const maxDate = format(new Date(srcDate.getTime() + 7 * 86400000), "yyyy-MM-dd");
+
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("*, accounts(*)")
+    .eq("household_id", source.household_id)
+    .gte("amount", targetAmount - epsilon)
+    .lte("amount", targetAmount + epsilon)
+    .neq("account_id", source.account_id)
+    .eq("is_transfer", false)
+    .eq("is_split", false)
+    .gte("date", minDate)
+    .lte("date", maxDate)
+    .neq("id", txnId)
+    .order("date", { ascending: false })
+    .limit(20);
+
+  if (error) throw error;
+  return data as TransferMatch[];
+}
+
 export async function unlinkTransferPair(txnId: string) {
   // Get the paired transaction id
   const { data: txn, error: fetchError } = await supabase
