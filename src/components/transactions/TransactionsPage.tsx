@@ -48,6 +48,7 @@ import { CSVImportDialog } from "./CSVImportDialog";
 import { QFXImportDialog } from "./QFXImportDialog";
 import { SplitTransactionDialog } from "./SplitTransactionDialog";
 import { TransferMatchDialog } from "./TransferMatchDialog";
+import { TransactionDetailDrawer } from "./TransactionDetailDrawer";
 import {
   useTransactions,
   useUpdateTransaction,
@@ -69,9 +70,11 @@ const PAGE_SIZE = 50;
 
 export function Component() {
   const [searchParams] = useSearchParams();
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const initialSearch = searchParams.get("search") ?? "";
   const initialCategory = searchParams.get("categoryId");
+  const initialAmountType = searchParams.get("amountType");
+  const [search, setSearch] = useState(initialSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
   const [categoryFilter, setCategoryFilter] = useState<string[]>(
     initialCategory ? [initialCategory] : []
   );
@@ -84,14 +87,21 @@ export function Component() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [sourceFilter, setSourceFilter] = useState<string[]>([]);
   const [classifiedByFilter, setClassifiedByFilter] = useState<string[]>([]);
-  const [minAmount, setMinAmount] = useState("");
-  const [maxAmount, setMaxAmount] = useState("");
+  const [minAmount, setMinAmount] = useState(
+    initialAmountType === "expenses" ? "0.01" : ""
+  );
+  const [maxAmount, setMaxAmount] = useState(
+    initialAmountType === "income" ? "-0.01" : ""
+  );
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [splitTxn, setSplitTxn] = useState<Tables<"transactions"> | null>(null);
   const [matchTxn, setMatchTxn] = useState<Tables<"transactions"> | null>(null);
+  const [detailTxn, setDetailTxn] = useState<(Tables<"transactions"> & { categories: Tables<"categories"> | null; accounts: Tables<"accounts"> | null }) | null>(null);
   const [checksOnly, setChecksOnly] = useState(false);
-  const [showFilters, setShowFilters] = useState(!!searchParams.get("categoryId"));
+  const [showFilters, setShowFilters] = useState(
+    !!searchParams.get("categoryId") || !!initialAmountType
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -559,19 +569,6 @@ export function Component() {
               ))}
             </PopoverContent>
           </Popover>
-          {selected.size === 1 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const id = Array.from(selected)[0];
-                const txn = transactions.find((t) => t.id === id);
-                if (txn) setMatchTxn(txn);
-              }}
-            >
-              <Search className="h-3 w-3 mr-1" /> Find Match
-            </Button>
-          )}
           {selected.size === 2 && (
             <Button variant="outline" size="sm" onClick={handleMarkAsTransfer}>
               <ArrowLeftRight className="h-3 w-3 mr-1" /> Mark as Transfer
@@ -663,7 +660,7 @@ export function Component() {
                   <TableRow
                     key={txn.id}
                     className="group cursor-pointer"
-                    onClick={() => setMatchTxn(txn)}
+                    onClick={() => setDetailTxn(txn)}
                   >
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Checkbox
@@ -734,6 +731,15 @@ export function Component() {
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                          onClick={() => setMatchTxn(txn)}
+                          title="Find transfer match"
+                        >
+                          <Search className="h-3 w-3" />
+                        </Button>
                         {txn.is_transfer && (
                           <Button
                             variant="ghost"
@@ -811,6 +817,33 @@ export function Component() {
           }}
         />
       )}
+
+      <TransactionDetailDrawer
+        transaction={detailTxn}
+        open={!!detailTxn}
+        onOpenChange={(open) => !open && setDetailTxn(null)}
+        onFindMatch={(txn) => {
+          setDetailTxn(null);
+          setMatchTxn(txn);
+        }}
+        onSplit={(txn) => {
+          setDetailTxn(null);
+          setSplitTxn(txn);
+        }}
+        onDelete={async (txnId) => {
+          setDetailTxn(null);
+          try {
+            await deleteTxns.mutateAsync([txnId]);
+            toast.success("Transaction deleted");
+          } catch {
+            toast.error("Failed to delete transaction");
+          }
+        }}
+        onUnlink={async (txnId) => {
+          setDetailTxn(null);
+          await handleUnlinkTransfer(txnId);
+        }}
+      />
     </div>
   );
 }

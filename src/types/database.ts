@@ -566,6 +566,7 @@ export interface Database {
           category_color: string | null;
           category_icon: string | null;
           total: number;
+          parent_id: string | null;
         }[];
       };
     };

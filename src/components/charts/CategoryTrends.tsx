@@ -48,6 +48,8 @@ export function CategoryTrends({
           tickFormatter={(val) => `$${val}`}
         />
         <Tooltip
+          wrapperStyle={{ zIndex: 50 }}
+          allowEscapeViewBox={{ x: true, y: true }}
           content={({ active, payload, label }) => {
             if (!active || !payload?.length) return null;
             return (

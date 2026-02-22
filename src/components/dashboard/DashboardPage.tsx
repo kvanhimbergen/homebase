@@ -53,6 +53,21 @@ export function Component() {
 
   const totalSpent = spending?.reduce((sum, s) => sum + Math.abs(s.total), 0) ?? 0;
 
+  // Drill-down state
+  const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
+  const [selectedParentName, setSelectedParentName] = useState<string | null>(null);
+  const [hoveredCategoryId, setHoveredCategoryId] = useState<string | null>(null);
+
+  // Reset drill-down when month changes
+  const monthKey = format(currentDate, "yyyy-MM");
+  const [prevMonth, setPrevMonth] = useState(monthKey);
+  if (monthKey !== prevMonth) {
+    setPrevMonth(monthKey);
+    setSelectedParentId(null);
+    setSelectedParentName(null);
+    setHoveredCategoryId(null);
+  }
+
   function calcDelta(current: number, previous: number): number | null {
     if (previous === 0) return null;
     return ((current - previous) / previous) * 100;
@@ -62,8 +77,21 @@ export function Component() {
   const expenseDelta = prevCashFlow ? calcDelta(cashFlow?.expenses ?? 0, prevCashFlow.expenses) : null;
   const netDelta = prevCashFlow ? calcDelta(cashFlow?.net ?? 0, prevCashFlow.net) : null;
 
-  function handleCategoryClick(categoryId: string) {
-    navigate(`/transactions?categoryId=${categoryId}`);
+  function handleCategoryClick(categoryId: string, hasCategoryChildren: boolean) {
+    if (hasCategoryChildren && !selectedParentId) {
+      const parentItem = spending?.find((s) => s.category_id === categoryId);
+      setSelectedParentId(categoryId);
+      setSelectedParentName(parentItem?.category_name ?? null);
+      setHoveredCategoryId(null);
+    } else {
+      navigate(`/transactions?categoryId=${categoryId}`);
+    }
+  }
+
+  function handleCategoryBack() {
+    setSelectedParentId(null);
+    setSelectedParentName(null);
+    setHoveredCategoryId(null);
   }
 
   return (
@@ -107,6 +135,7 @@ export function Component() {
           loading={cashFlowLoading}
           delta={incomeDelta}
           deltaInverted={false}
+          onClick={() => navigate("/transactions?amountType=income")}
         />
         <CashFlowCard
           title="Expenses"
@@ -116,6 +145,7 @@ export function Component() {
           loading={cashFlowLoading}
           delta={expenseDelta}
           deltaInverted={true}
+          onClick={() => navigate("/transactions?amountType=expenses")}
         />
         <CashFlowCard
           title="Net"
@@ -130,7 +160,7 @@ export function Component() {
 
       {/* Cash Flow Bar Chart + Spending Donut */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Cash Flow Trend</CardTitle>
           </CardHeader>
@@ -153,7 +183,7 @@ export function Component() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Spending by Category</CardTitle>
           </CardHeader>
@@ -173,11 +203,19 @@ export function Component() {
                   data={spending}
                   total={totalSpent}
                   onCategoryClick={handleCategoryClick}
+                  selectedParentId={selectedParentId}
+                  selectedParentName={selectedParentName}
+                  onBack={handleCategoryBack}
+                  hoveredCategoryId={hoveredCategoryId}
+                  onHoverCategory={setHoveredCategoryId}
                 />
                 <div className="mt-4">
                   <SpendingLegend
                     data={spending}
                     onCategoryClick={handleCategoryClick}
+                    selectedParentId={selectedParentId}
+                    hoveredCategoryId={hoveredCategoryId}
+                    onHoverCategory={setHoveredCategoryId}
                   />
                 </div>
               </>
@@ -198,7 +236,7 @@ export function Component() {
 
       {/* Budget Progress + Recent Transactions */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Budget Progress</CardTitle>
           </CardHeader>
@@ -271,7 +309,7 @@ export function Component() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">Recent Transactions</CardTitle>
             <Button variant="ghost" size="sm" className="text-xs" asChild>
@@ -299,10 +337,15 @@ export function Component() {
                 {recentTxns.map((txn) => (
                   <div
                     key={txn.id}
-                    className="flex items-center gap-4 py-2.5 px-2 rounded-md hover:bg-muted/50 transition-colors"
+                    className="flex items-center gap-4 py-2.5 px-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() =>
+                      navigate(
+                        `/transactions?search=${encodeURIComponent(txn.merchant_name ?? txn.name)}`
+                      )
+                    }
                   >
                     <div
-                      className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-medium text-white shrink-0"
+                      className="h-9 w-9 rounded-lg flex items-center justify-center text-xs font-medium text-white shrink-0"
                       style={{
                         backgroundColor: txn.categories?.color ?? "#64748b",
                       }}
@@ -372,13 +415,13 @@ function AccountBalanceBanner({
   loading: boolean;
 }) {
   return (
-    <Card className="bg-gradient-to-r from-slate-900 to-slate-800 text-white border-0">
+    <Card className="bg-gradient-to-r from-navy to-navy-light text-white border-0 shadow-lg">
       <CardContent className="pt-6 pb-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm text-slate-300 mb-1">Net Worth</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-white/60 mb-1">Net Worth</p>
             {loading ? (
-              <Skeleton className="h-9 w-40 bg-slate-700" />
+              <Skeleton className="h-9 w-40 bg-white/10" />
             ) : (
               <p className="text-3xl font-bold">
                 {formatCurrency(balances?.netWorth ?? 0)}
@@ -432,13 +475,13 @@ function BalanceMiniCard({
   negative?: boolean;
 }) {
   return (
-    <div className="bg-white/10 rounded-lg px-3 py-2 min-w-[130px]">
-      <div className="flex items-center gap-1.5 mb-1 text-slate-300">
+    <div className="bg-white/[0.07] backdrop-blur-sm rounded-lg px-3 py-2 min-w-[130px]">
+      <div className="flex items-center gap-1.5 mb-1 text-white/50">
         {icon}
         <span className="text-xs">{label}</span>
       </div>
       {loading ? (
-        <Skeleton className="h-5 w-16 bg-slate-700" />
+        <Skeleton className="h-5 w-16 bg-white/10" />
       ) : (
         <p className="text-sm font-semibold tabular-nums">
           {negative && amount > 0 ? "-" : ""}
@@ -457,6 +500,7 @@ function CashFlowCard({
   loading,
   delta,
   deltaInverted,
+  onClick,
 }: {
   title: string;
   amount: number;
@@ -465,12 +509,19 @@ function CashFlowCard({
   loading: boolean;
   delta: number | null;
   deltaInverted: boolean;
+  onClick?: () => void;
 }) {
   return (
-    <Card>
+    <Card
+      className={cn(
+        "shadow-sm hover:shadow-md transition-shadow",
+        onClick && "cursor-pointer"
+      )}
+      onClick={onClick}
+    >
       <CardContent className="pt-6">
         <div className="flex items-center gap-2 mb-2">
-          <span className={className}>{icon}</span>
+          <span className={cn("h-8 w-8 rounded-lg bg-primary/10 inline-flex items-center justify-center", className)}>{icon}</span>
           <span className="text-sm text-muted-foreground">{title}</span>
         </div>
         {loading ? (

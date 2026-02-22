@@ -40,6 +40,8 @@ export function CashFlowBar({
           tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
         />
         <Tooltip
+          wrapperStyle={{ zIndex: 50 }}
+          allowEscapeViewBox={{ x: true, y: true }}
           content={({ active, payload, label }) => {
             if (!active || !payload?.length) return null;
             return (
