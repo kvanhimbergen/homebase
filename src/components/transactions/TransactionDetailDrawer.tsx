@@ -14,6 +14,7 @@ import {
   Trash2,
   Unlink,
   ArrowLeftRight,
+  Camera,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ interface TransactionDetailDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onFindMatch: (txn: TransactionWithRelations) => void;
+  onScanReceipt: (txn: TransactionWithRelations) => void;
   onSplit: (txn: TransactionWithRelations) => void;
   onDelete: (txnId: string) => void;
   onUnlink: (txnId: string) => void;
@@ -39,6 +41,7 @@ export function TransactionDetailDrawer({
   open,
   onOpenChange,
   onFindMatch,
+  onScanReceipt,
   onSplit,
   onDelete,
   onUnlink,
@@ -152,6 +155,14 @@ export function TransactionDetailDrawer({
           >
             <Search className="h-4 w-4 mr-2" />
             Find Transfer Match
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            onClick={() => onScanReceipt(transaction)}
+          >
+            <Camera className="h-4 w-4 mr-2" />
+            Scan Receipt
           </Button>
           <Button
             variant="outline"

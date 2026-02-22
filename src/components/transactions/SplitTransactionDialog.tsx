@@ -35,15 +35,21 @@ export function SplitTransactionDialog({
   transaction,
   open,
   onOpenChange,
+  initialLines,
 }: {
   transaction: Tables<"transactions">;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialLines?: SplitLine[];
 }) {
-  const [lines, setLines] = useState<SplitLine[]>([
-    { name: transaction.name, amount: String(Math.abs(transaction.amount)), categoryId: "" },
-    { name: "", amount: "", categoryId: "" },
-  ]);
+  const [lines, setLines] = useState<SplitLine[]>(
+    initialLines && initialLines.length > 0
+      ? initialLines
+      : [
+          { name: transaction.name, amount: String(Math.abs(transaction.amount)), categoryId: "" },
+          { name: "", amount: "", categoryId: "" },
+        ]
+  );
   const [saving, setSaving] = useState(false);
 
   const { currentHouseholdId } = useHousehold();

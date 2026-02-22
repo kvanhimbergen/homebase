@@ -47,6 +47,7 @@ import { AddTransactionDialog } from "./AddTransactionDialog";
 import { CSVImportDialog } from "./CSVImportDialog";
 import { QFXImportDialog } from "./QFXImportDialog";
 import { SplitTransactionDialog } from "./SplitTransactionDialog";
+import { ReceiptScanDialog } from "./ReceiptScanDialog";
 import { TransferMatchDialog } from "./TransferMatchDialog";
 import { TransactionDetailDrawer } from "./TransactionDetailDrawer";
 import {
@@ -100,6 +101,8 @@ export function Component() {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [splitTxn, setSplitTxn] = useState<Tables<"transactions"> | null>(null);
+  const [receiptScanTxn, setReceiptScanTxn] = useState<Tables<"transactions"> | null>(null);
+  const [receiptLines, setReceiptLines] = useState<{ name: string; amount: string; categoryId: string }[] | undefined>();
   const [matchTxn, setMatchTxn] = useState<Tables<"transactions"> | null>(null);
   const [detailTxn, setDetailTxn] = useState<(Tables<"transactions"> & { categories: Tables<"categories"> | null; accounts: Tables<"accounts"> | null }) | null>(null);
   const [checksOnly, setChecksOnly] = useState(false);
@@ -838,7 +841,13 @@ export function Component() {
         <SplitTransactionDialog
           transaction={splitTxn}
           open={!!splitTxn}
-          onOpenChange={(open) => !open && setSplitTxn(null)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSplitTxn(null);
+              setReceiptLines(undefined);
+            }
+          }}
+          initialLines={receiptLines}
         />
       )}
 
@@ -855,6 +864,20 @@ export function Component() {
         />
       )}
 
+      {receiptScanTxn && (
+        <ReceiptScanDialog
+          transaction={receiptScanTxn}
+          open={!!receiptScanTxn}
+          onOpenChange={(open) => !open && setReceiptScanTxn(null)}
+          onSplitWithLines={(lines) => {
+            const txn = receiptScanTxn;
+            setReceiptScanTxn(null);
+            setReceiptLines(lines);
+            setSplitTxn(txn);
+          }}
+        />
+      )}
+
       <TransactionDetailDrawer
         transaction={detailTxn}
         open={!!detailTxn}
@@ -862,6 +885,10 @@ export function Component() {
         onFindMatch={(txn) => {
           setDetailTxn(null);
           setMatchTxn(txn);
+        }}
+        onScanReceipt={(txn) => {
+          setDetailTxn(null);
+          setReceiptScanTxn(txn);
         }}
         onSplit={(txn) => {
           setDetailTxn(null);
