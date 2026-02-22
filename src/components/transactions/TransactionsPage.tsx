@@ -73,6 +73,8 @@ export function Component() {
   const initialSearch = searchParams.get("search") ?? "";
   const initialCategory = searchParams.get("categoryId");
   const initialAmountType = searchParams.get("amountType");
+  const initialStartDate = searchParams.get("startDate");
+  const initialEndDate = searchParams.get("endDate");
   const [search, setSearch] = useState(initialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
   const [categoryFilter, setCategoryFilter] = useState<string[]>(
@@ -80,9 +82,11 @@ export function Component() {
   );
   const [accountFilter, setAccountFilter] = useState<string[]>([]);
   const [startDate, setStartDate] = useState(
-    format(subMonths(new Date(), 3), "yyyy-MM-dd")
+    initialStartDate || format(subMonths(new Date(), 3), "yyyy-MM-dd")
   );
-  const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [endDate, setEndDate] = useState(
+    initialEndDate || format(new Date(), "yyyy-MM-dd")
+  );
   const [sortBy, setSortBy] = useState<SortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [sourceFilter, setSourceFilter] = useState<string[]>([]);
@@ -108,6 +112,8 @@ export function Component() {
     const urlSearch = searchParams.get("search") ?? "";
     const urlCategory = searchParams.get("categoryId");
     const urlAmountType = searchParams.get("amountType");
+    const urlStartDate = searchParams.get("startDate");
+    const urlEndDate = searchParams.get("endDate");
 
     if (urlSearch) {
       setSearch(urlSearch);
@@ -125,6 +131,12 @@ export function Component() {
       setMinAmount("0.01");
       setMaxAmount("");
       setShowFilters(true);
+    }
+    if (urlStartDate) {
+      setStartDate(urlStartDate);
+    }
+    if (urlEndDate) {
+      setEndDate(urlEndDate);
     }
   }, [searchParams]);
 
