@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import type { Tables } from "@/types/database";
+import type { Tables, UpdateTables } from "@/types/database";
 import { useAuth } from "./useAuth";
 
 export function useHousehold() {
@@ -84,6 +84,20 @@ export function useHousehold() {
     },
   });
 
+  const updateHousehold = useMutation({
+    mutationFn: async (updates: UpdateTables<"households">) => {
+      if (!currentHouseholdId) throw new Error("No household selected");
+      const { error } = await supabase
+        .from("households")
+        .update(updates)
+        .eq("id", currentHouseholdId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household-memberships"] });
+    },
+  });
+
   const switchHousehold = useMutation({
     mutationFn: async (householdId: string) => {
       const { error } = await supabase
@@ -105,6 +119,7 @@ export function useHousehold() {
     loading: membershipsQuery.isLoading || profileQuery.isLoading,
     hasHousehold: (membershipsQuery.data?.length ?? 0) > 0,
     createHousehold,
+    updateHousehold,
     switchHousehold,
   };
 }

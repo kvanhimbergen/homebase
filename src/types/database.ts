@@ -14,18 +14,21 @@ export interface Database {
           id: string;
           name: string;
           owner_id: string;
+          auto_classify_imports: boolean;
           created_at: string;
         };
         Insert: {
           id?: string;
           name: string;
           owner_id: string;
+          auto_classify_imports?: boolean;
           created_at?: string;
         };
         Update: {
           id?: string;
           name?: string;
           owner_id?: string;
+          auto_classify_imports?: boolean;
           created_at?: string;
         };
         Relationships: [];

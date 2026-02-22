@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -35,7 +36,7 @@ import { CATEGORY_COLORS } from "@/lib/constants";
 
 export function Component() {
   const { user, signOut } = useAuth();
-  const { currentHousehold, currentRole, memberships } = useHousehold();
+  const { currentHousehold, currentRole, memberships, updateHousehold } = useHousehold();
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -79,6 +80,33 @@ export function Component() {
                 <p className="text-sm font-medium capitalize">
                   {currentRole ?? "—"}
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Preferences</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Auto-classify imports</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Automatically categorize transactions using AI after CSV or QFX import
+                  </p>
+                </div>
+                <Switch
+                  checked={currentHousehold?.auto_classify_imports ?? false}
+                  onCheckedChange={async (checked: boolean) => {
+                    try {
+                      await updateHousehold.mutateAsync({ auto_classify_imports: checked });
+                      toast.success(checked ? "Auto-classify enabled" : "Auto-classify disabled");
+                    } catch {
+                      toast.error("Failed to update setting");
+                    }
+                  }}
+                />
               </div>
             </CardContent>
           </Card>

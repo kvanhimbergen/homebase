@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Upload } from "lucide-react";
-import { useCreateTransaction } from "@/hooks/useTransactions";
+import { useCreateTransaction, useClassifyTransactions } from "@/hooks/useTransactions";
 import { useHousehold } from "@/hooks/useHousehold";
 import { toast } from "sonner";
 import { parseOFX, type OFXTransaction } from "@/lib/ofx-parser";
@@ -28,8 +28,9 @@ export function QFXImportDialog() {
   const [transactions, setTransactions] = useState<OFXTransaction[]>([]);
   const [importing, setImporting] = useState(false);
 
-  const { currentHouseholdId } = useHousehold();
+  const { currentHouseholdId, currentHousehold } = useHousehold();
   const createTxn = useCreateTransaction();
+  const classifyTxns = useClassifyTransactions();
 
   const handleFile = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,9 +75,19 @@ export function QFXImportDialog() {
       }
     }
 
+    let classifyMsg = "";
+    if (imported > 0 && currentHousehold?.auto_classify_imports) {
+      try {
+        const result = await classifyTxns.mutateAsync();
+        classifyMsg = `, ${result.classified} classified`;
+      } catch {
+        classifyMsg = ", auto-classify failed";
+      }
+    }
+
     setImporting(false);
     toast.success(
-      `Imported ${imported} transactions${skipped > 0 ? `, ${skipped} skipped` : ""}`
+      `Imported ${imported} transactions${skipped > 0 ? `, ${skipped} skipped` : ""}${classifyMsg}`
     );
     setOpen(false);
     setTransactions([]);

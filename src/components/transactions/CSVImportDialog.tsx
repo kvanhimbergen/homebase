@@ -26,7 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Upload } from "lucide-react";
-import { useCreateTransaction } from "@/hooks/useTransactions";
+import { useCreateTransaction, useClassifyTransactions } from "@/hooks/useTransactions";
 import { useHousehold } from "@/hooks/useHousehold";
 import { toast } from "sonner";
 
@@ -43,8 +43,9 @@ export function CSVImportDialog() {
   const [mapping, setMapping] = useState({ date: "", name: "", amount: "" });
   const [importing, setImporting] = useState(false);
 
-  const { currentHouseholdId } = useHousehold();
+  const { currentHouseholdId, currentHousehold } = useHousehold();
   const createTxn = useCreateTransaction();
+  const classifyTxns = useClassifyTransactions();
 
   const handleFile = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,8 +139,18 @@ export function CSVImportDialog() {
       }
     }
 
+    let classifyMsg = "";
+    if (imported > 0 && currentHousehold?.auto_classify_imports) {
+      try {
+        const result = await classifyTxns.mutateAsync();
+        classifyMsg = `, ${result.classified} classified`;
+      } catch {
+        classifyMsg = ", auto-classify failed";
+      }
+    }
+
     setImporting(false);
-    toast.success(`Imported ${imported} transactions${skipped > 0 ? `, ${skipped} skipped` : ""}`);
+    toast.success(`Imported ${imported} transactions${skipped > 0 ? `, ${skipped} skipped` : ""}${classifyMsg}`);
     setOpen(false);
     setRows([]);
     setHeaders([]);
