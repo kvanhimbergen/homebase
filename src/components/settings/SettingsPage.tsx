@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   useCategories,
+  useCategoryTree,
   useCreateCategory,
   useDeleteCategory,
 } from "@/hooks/useCategories";
@@ -160,10 +161,11 @@ export function Component() {
 
 function CategoriesSettings() {
   const { data: categories } = useCategories();
+  const categoryTree = useCategoryTree();
   const deleteCategory = useDeleteCategory();
 
-  const systemCategories = categories?.filter((c) => c.is_system) ?? [];
   const customCategories = categories?.filter((c) => !c.is_system) ?? [];
+  const systemTree = categoryTree.filter((n) => n.parent.is_system);
 
   return (
     <div className="space-y-6">
@@ -220,17 +222,33 @@ function CategoriesSettings() {
           <CardTitle className="text-base">System Categories</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            {systemCategories.map((cat) => (
-              <div key={cat.id} className="flex items-center gap-3 py-2">
-                <div
-                  className="w-4 h-4 rounded-full"
-                  style={{ backgroundColor: cat.color ?? "#94a3b8" }}
-                />
-                <span className="text-sm">{cat.name}</span>
-                <Badge variant="secondary" className="text-[10px] ml-auto">
-                  System
-                </Badge>
+          <div className="space-y-1">
+            {systemTree.map(({ parent, children }) => (
+              <div key={parent.id}>
+                <div className="flex items-center gap-3 py-2">
+                  <div
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: parent.color ?? "#94a3b8" }}
+                  />
+                  <span className="text-sm font-medium">{parent.name}</span>
+                  <Badge variant="secondary" className="text-[10px] ml-auto">
+                    System
+                  </Badge>
+                </div>
+                {children.filter((c) => c.is_system).map((child) => (
+                  <div
+                    key={child.id}
+                    className="flex items-center gap-3 py-1.5 pl-7"
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: child.color ?? "#94a3b8" }}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {child.name}
+                    </span>
+                  </div>
+                ))}
               </div>
             ))}
           </div>

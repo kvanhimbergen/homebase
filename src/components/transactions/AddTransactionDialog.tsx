@@ -14,13 +14,14 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { useCreateTransaction } from "@/hooks/useTransactions";
-import { useCategories } from "@/hooks/useCategories";
+import { useCategoryTree } from "@/hooks/useCategories";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useHousehold } from "@/hooks/useHousehold";
 import { toast } from "sonner";
@@ -37,7 +38,7 @@ export function AddTransactionDialog() {
   const [isExpense, setIsExpense] = useState(true);
 
   const { currentHouseholdId } = useHousehold();
-  const { data: categories } = useCategories();
+  const categoryTree = useCategoryTree();
   const { data: accounts } = useAccounts();
   const createTxn = useCreateTransaction();
 
@@ -155,10 +156,15 @@ export function AddTransactionDialog() {
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories?.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
+                  {categoryTree.map(({ parent, children }) => (
+                    <SelectGroup key={parent.id}>
+                      <SelectItem value={parent.id}>{parent.name}</SelectItem>
+                      {children.map((c) => (
+                        <SelectItem key={c.id} value={c.id} className="pl-6">
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>

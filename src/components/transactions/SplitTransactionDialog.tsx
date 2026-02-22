@@ -11,13 +11,14 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import { useCreateTransaction, useUpdateTransaction } from "@/hooks/useTransactions";
-import { useCategories } from "@/hooks/useCategories";
+import { useCategoryTree } from "@/hooks/useCategories";
 import { useHousehold } from "@/hooks/useHousehold";
 import { formatCurrency } from "@/lib/formatters";
 import type { Tables } from "@/types/database";
@@ -46,7 +47,7 @@ export function SplitTransactionDialog({
   const [saving, setSaving] = useState(false);
 
   const { currentHouseholdId } = useHousehold();
-  const { data: categories } = useCategories();
+  const categoryTree = useCategoryTree();
   const createTxn = useCreateTransaction();
   const updateTxn = useUpdateTransaction();
 
@@ -162,10 +163,15 @@ export function SplitTransactionDialog({
                       <SelectValue placeholder="Category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories?.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
+                      {categoryTree.map(({ parent, children }) => (
+                        <SelectGroup key={parent.id}>
+                          <SelectItem value={parent.id}>{parent.name}</SelectItem>
+                          {children.map((c) => (
+                            <SelectItem key={c.id} value={c.id} className="pl-6">
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
                       ))}
                     </SelectContent>
                   </Select>

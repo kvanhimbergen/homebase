@@ -25,6 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -55,7 +56,7 @@ import {
   useLinkTransferPair,
   useUnlinkTransferPair,
 } from "@/hooks/useTransactions";
-import { useCategories } from "@/hooks/useCategories";
+import { useCategories, useCategoryTree } from "@/hooks/useCategories";
 import { useAccounts } from "@/hooks/useAccounts";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
@@ -123,6 +124,7 @@ export function Component() {
   });
 
   const { data: categories } = useCategories();
+  const categoryTree = useCategoryTree();
   const { data: accounts } = useAccounts();
   const updateTxn = useUpdateTransaction();
   const deleteTxns = useDeleteTransactions();
@@ -535,15 +537,25 @@ export function Component() {
                 Set Category
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-48 p-1">
-              {categories?.map((c) => (
-                <button
-                  key={c.id}
-                  className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-accent"
-                  onClick={() => handleBulkCategory(c.id)}
-                >
-                  {c.name}
-                </button>
+            <PopoverContent className="w-52 p-1 max-h-72 overflow-y-auto">
+              {categoryTree.map(({ parent, children }) => (
+                <div key={parent.id}>
+                  <button
+                    className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-accent font-medium"
+                    onClick={() => handleBulkCategory(parent.id)}
+                  >
+                    {parent.name}
+                  </button>
+                  {children.map((c) => (
+                    <button
+                      key={c.id}
+                      className="w-full text-left pl-6 pr-3 py-1.5 text-sm rounded hover:bg-accent text-muted-foreground"
+                      onClick={() => handleBulkCategory(c.id)}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
               ))}
             </PopoverContent>
           </Popover>
@@ -706,7 +718,6 @@ export function Component() {
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <InlineCategorySelect
                         transaction={txn}
-                        categories={categories ?? []}
                       />
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
@@ -852,12 +863,11 @@ function SortableHeader({
 
 function InlineCategorySelect({
   transaction,
-  categories,
 }: {
   transaction: Tables<"transactions"> & { categories: Tables<"categories"> | null };
-  categories: Tables<"categories">[];
 }) {
   const updateTxn = useUpdateTransaction();
+  const tree = useCategoryTree();
 
   return (
     <Select
@@ -899,16 +909,23 @@ function InlineCategorySelect({
         <SelectItem value="__uncategorized__">
           <span className="text-muted-foreground">Uncategorized</span>
         </SelectItem>
-        {categories.map((c) => (
-          <SelectItem key={c.id} value={c.id}>
-            <div className="flex items-center gap-1.5">
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: c.color ?? "#94a3b8" }}
-              />
-              {c.name}
-            </div>
-          </SelectItem>
+        {tree.map(({ parent, children }) => (
+          <SelectGroup key={parent.id}>
+            <SelectItem value={parent.id}>
+              <div className="flex items-center gap-1.5">
+                <div
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: parent.color ?? "#94a3b8" }}
+                />
+                {parent.name}
+              </div>
+            </SelectItem>
+            {children.map((c) => (
+              <SelectItem key={c.id} value={c.id} className="pl-6">
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectGroup>
         ))}
       </SelectContent>
     </Select>

@@ -6,6 +6,7 @@ export async function getCategories(householdId: string) {
     .from("categories")
     .select("*")
     .eq("household_id", householdId)
+    .order("parent_id", { nullsFirst: true })
     .order("name");
 
   if (error) throw error;

@@ -12,6 +12,12 @@ export const CATEGORY_COLORS = [
   "var(--color-category-11)",
   "var(--color-category-12)",
   "var(--color-category-13)",
+  "var(--color-category-14)",
+  "var(--color-category-15)",
+  "var(--color-category-16)",
+  "var(--color-category-17)",
+  "var(--color-category-18)",
+  "var(--color-category-19)",
 ] as const;
 
 export const TRANSACTION_SOURCES = [
