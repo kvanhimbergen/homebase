@@ -113,12 +113,15 @@ export function Component() {
                 className="pl-9"
               />
             </div>
-            <Select value={tagFilter} onValueChange={setTagFilter}>
+            <Select
+              value={tagFilter || "__all__"}
+              onValueChange={(v) => setTagFilter(v === "__all__" ? "" : v)}
+            >
               <SelectTrigger className="w-36 h-9">
                 <SelectValue placeholder="All tags" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All tags</SelectItem>
+                <SelectItem value="__all__">All tags</SelectItem>
                 {DOCUMENT_TAGS.map((tag) => (
                   <SelectItem key={tag} value={tag}>
                     {tag}

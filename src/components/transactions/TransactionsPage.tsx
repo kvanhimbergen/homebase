@@ -648,8 +648,12 @@ export function Component() {
                 </TableRow>
               ) : (
                 transactions.map((txn) => (
-                  <TableRow key={txn.id} className="group">
-                    <TableCell>
+                  <TableRow
+                    key={txn.id}
+                    className="group cursor-pointer"
+                    onClick={() => setMatchTxn(txn)}
+                  >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={selected.has(txn.id)}
                         onCheckedChange={() => toggleSelect(txn.id)}
@@ -699,7 +703,7 @@ export function Component() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <InlineCategorySelect
                         transaction={txn}
                         categories={categories ?? []}
@@ -717,7 +721,7 @@ export function Component() {
                       {txn.amount < 0 ? "+" : "-"}
                       {formatCurrency(Math.abs(txn.amount))}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center">
                         {txn.is_transfer && (
                           <Button
