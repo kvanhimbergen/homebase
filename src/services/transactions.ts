@@ -9,14 +9,14 @@ export type SortDirection = "asc" | "desc";
 export interface TransactionFilters {
   householdId: string;
   search?: string;
-  accountId?: string;
-  categoryId?: string;
+  accountIds?: string[];
+  categoryIds?: string[];
   startDate?: string;
   endDate?: string;
   sortBy?: SortField;
   sortDirection?: SortDirection;
-  source?: TransactionSource;
-  classifiedBy?: "user" | "ai" | "plaid" | "none";
+  sources?: TransactionSource[];
+  classifiedByList?: ("user" | "ai" | "plaid" | "none")[];
   minAmount?: number;
   maxAmount?: number;
   limit?: number;
@@ -44,11 +44,11 @@ export async function getTransactions(filters: TransactionFilters) {
       `name.ilike.%${filters.search}%,merchant_name.ilike.%${filters.search}%`
     );
   }
-  if (filters.accountId) {
-    query = query.eq("account_id", filters.accountId);
+  if (filters.accountIds && filters.accountIds.length > 0) {
+    query = query.in("account_id", filters.accountIds);
   }
-  if (filters.categoryId) {
-    query = query.eq("category_id", filters.categoryId);
+  if (filters.categoryIds && filters.categoryIds.length > 0) {
+    query = query.in("category_id", filters.categoryIds);
   }
   if (filters.startDate) {
     query = query.gte("date", filters.startDate);
@@ -56,14 +56,18 @@ export async function getTransactions(filters: TransactionFilters) {
   if (filters.endDate) {
     query = query.lte("date", filters.endDate);
   }
-  if (filters.source) {
-    query = query.eq("source", filters.source);
+  if (filters.sources && filters.sources.length > 0) {
+    query = query.in("source", filters.sources);
   }
-  if (filters.classifiedBy) {
-    if (filters.classifiedBy === "none") {
+  if (filters.classifiedByList && filters.classifiedByList.length > 0) {
+    const hasNone = filters.classifiedByList.includes("none");
+    const others = filters.classifiedByList.filter((v) => v !== "none");
+    if (hasNone && others.length > 0) {
+      query = query.or(`category_id.is.null,classified_by.in.(${others.join(",")})`);
+    } else if (hasNone) {
       query = query.is("category_id", null);
     } else {
-      query = query.eq("classified_by", filters.classifiedBy);
+      query = query.in("classified_by", others);
     }
   }
   if (filters.minAmount != null) {

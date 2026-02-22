@@ -12,6 +12,7 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  ChevronDown,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,18 +64,19 @@ export function Component() {
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState(
-    searchParams.get("categoryId") ?? ""
+  const initialCategory = searchParams.get("categoryId");
+  const [categoryFilter, setCategoryFilter] = useState<string[]>(
+    initialCategory ? [initialCategory] : []
   );
-  const [accountFilter, setAccountFilter] = useState("");
+  const [accountFilter, setAccountFilter] = useState<string[]>([]);
   const [startDate, setStartDate] = useState(
     format(subMonths(new Date(), 3), "yyyy-MM-dd")
   );
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [sortBy, setSortBy] = useState<SortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [sourceFilter, setSourceFilter] = useState("");
-  const [classifiedByFilter, setClassifiedByFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<string[]>([]);
+  const [classifiedByFilter, setClassifiedByFilter] = useState<string[]>([]);
   const [minAmount, setMinAmount] = useState("");
   const [maxAmount, setMaxAmount] = useState("");
   const [page, setPage] = useState(0);
@@ -97,14 +99,14 @@ export function Component() {
 
   const { data: result, isLoading } = useTransactions({
     search: debouncedSearch || undefined,
-    categoryId: categoryFilter || undefined,
-    accountId: accountFilter || undefined,
+    categoryIds: categoryFilter.length > 0 ? categoryFilter : undefined,
+    accountIds: accountFilter.length > 0 ? accountFilter : undefined,
     startDate,
     endDate,
     sortBy,
     sortDirection,
-    source: (sourceFilter as TransactionSource) || undefined,
-    classifiedBy: (classifiedByFilter as "user" | "ai" | "plaid" | "none") || undefined,
+    sources: sourceFilter.length > 0 ? sourceFilter as TransactionSource[] : undefined,
+    classifiedByList: classifiedByFilter.length > 0 ? classifiedByFilter as ("user" | "ai" | "plaid" | "none")[] : undefined,
     minAmount: parsedMin != null && !isNaN(parsedMin) ? parsedMin : undefined,
     maxAmount: parsedMax != null && !isNaN(parsedMax) ? parsedMax : undefined,
     limit: PAGE_SIZE,
@@ -243,65 +245,191 @@ export function Component() {
 
           {showFilters && (
             <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t">
-              <div className="w-44">
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="All categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All categories</SelectItem>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="h-9 text-sm w-44 justify-between font-normal">
+                    {categoryFilter.length === 0
+                      ? "All categories"
+                      : categoryFilter.length === 1
+                        ? categories?.find((c) => c.id === categoryFilter[0])?.name ?? "1 category"
+                        : `${categoryFilter.length} categories`}
+                    <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-52 p-2" align="start">
+                  <div className="max-h-60 overflow-y-auto space-y-0.5">
                     {categories?.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
+                      <label
+                        key={c.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer text-sm"
+                      >
+                        <Checkbox
+                          checked={categoryFilter.includes(c.id)}
+                          onCheckedChange={(checked) => {
+                            setCategoryFilter((prev) =>
+                              checked
+                                ? [...prev, c.id]
+                                : prev.filter((id) => id !== c.id)
+                            );
+                          }}
+                        />
+                        <div
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: c.color ?? "#94a3b8" }}
+                        />
+                        <span className="truncate">{c.name}</span>
+                      </label>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="w-44">
-                <Select value={accountFilter} onValueChange={setAccountFilter}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="All accounts" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All accounts</SelectItem>
+                  </div>
+                  {categoryFilter.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full mt-1"
+                      onClick={() => setCategoryFilter([])}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="h-9 text-sm w-44 justify-between font-normal">
+                    {accountFilter.length === 0
+                      ? "All accounts"
+                      : accountFilter.length === 1
+                        ? accounts?.find((a) => a.id === accountFilter[0])?.name ?? "1 account"
+                        : `${accountFilter.length} accounts`}
+                    <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-52 p-2" align="start">
+                  <div className="max-h-60 overflow-y-auto space-y-0.5">
                     {accounts?.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.name}
-                      </SelectItem>
+                      <label
+                        key={a.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer text-sm"
+                      >
+                        <Checkbox
+                          checked={accountFilter.includes(a.id)}
+                          onCheckedChange={(checked) => {
+                            setAccountFilter((prev) =>
+                              checked
+                                ? [...prev, a.id]
+                                : prev.filter((id) => id !== a.id)
+                            );
+                          }}
+                        />
+                        <span className="truncate">{a.name}</span>
+                      </label>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="w-36">
-                <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="All sources" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All sources</SelectItem>
+                  </div>
+                  {accountFilter.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full mt-1"
+                      onClick={() => setAccountFilter([])}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="h-9 text-sm w-36 justify-between font-normal">
+                    {sourceFilter.length === 0
+                      ? "All sources"
+                      : sourceFilter.length === 1
+                        ? sourceFilter[0].charAt(0).toUpperCase() + sourceFilter[0].slice(1)
+                        : `${sourceFilter.length} sources`}
+                    <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-44 p-2" align="start">
+                  <div className="space-y-0.5">
                     {TRANSACTION_SOURCES.map((s) => (
-                      <SelectItem key={s} value={s}>
+                      <label
+                        key={s}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer text-sm"
+                      >
+                        <Checkbox
+                          checked={sourceFilter.includes(s)}
+                          onCheckedChange={(checked) => {
+                            setSourceFilter((prev) =>
+                              checked
+                                ? [...prev, s]
+                                : prev.filter((v) => v !== s)
+                            );
+                          }}
+                        />
                         {s.charAt(0).toUpperCase() + s.slice(1)}
-                      </SelectItem>
+                      </label>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="w-44">
-                <Select value={classifiedByFilter} onValueChange={setClassifiedByFilter}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="All statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All statuses</SelectItem>
-                    <SelectItem value="ai">AI classified</SelectItem>
-                    <SelectItem value="user">User classified</SelectItem>
-                    <SelectItem value="plaid">Plaid classified</SelectItem>
-                    <SelectItem value="none">Uncategorized</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                  </div>
+                  {sourceFilter.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full mt-1"
+                      onClick={() => setSourceFilter([])}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="h-9 text-sm w-44 justify-between font-normal">
+                    {classifiedByFilter.length === 0
+                      ? "All statuses"
+                      : classifiedByFilter.length === 1
+                        ? { ai: "AI classified", user: "User classified", plaid: "Plaid classified", none: "Uncategorized" }[classifiedByFilter[0]]
+                        : `${classifiedByFilter.length} statuses`}
+                    <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48 p-2" align="start">
+                  <div className="space-y-0.5">
+                    {([
+                      { value: "ai", label: "AI classified" },
+                      { value: "user", label: "User classified" },
+                      { value: "plaid", label: "Plaid classified" },
+                      { value: "none", label: "Uncategorized" },
+                    ] as const).map(({ value, label }) => (
+                      <label
+                        key={value}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer text-sm"
+                      >
+                        <Checkbox
+                          checked={classifiedByFilter.includes(value)}
+                          onCheckedChange={(checked) => {
+                            setClassifiedByFilter((prev) =>
+                              checked
+                                ? [...prev, value]
+                                : prev.filter((v) => v !== value)
+                            );
+                          }}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                  {classifiedByFilter.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full mt-1"
+                      onClick={() => setClassifiedByFilter([])}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </PopoverContent>
+              </Popover>
               <Input
                 type="date"
                 value={startDate}
@@ -315,28 +443,31 @@ export function Component() {
                 onChange={(e) => setEndDate(e.target.value)}
                 className="w-36 h-9 text-sm"
               />
-              <Input
-                type="number"
-                placeholder="Min $"
-                value={minAmount}
-                onChange={(e) => setMinAmount(e.target.value)}
-                className="w-24 h-9 text-sm"
-              />
-              <Input
-                type="number"
-                placeholder="Max $"
-                value={maxAmount}
-                onChange={(e) => setMaxAmount(e.target.value)}
-                className="w-24 h-9 text-sm"
-              />
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="number"
+                  placeholder="Min $"
+                  value={minAmount}
+                  onChange={(e) => setMinAmount(e.target.value)}
+                  className="w-24 h-9 text-sm"
+                />
+                <span className="text-sm text-muted-foreground">–</span>
+                <Input
+                  type="number"
+                  placeholder="Max $"
+                  value={maxAmount}
+                  onChange={(e) => setMaxAmount(e.target.value)}
+                  className="w-24 h-9 text-sm"
+                />
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setCategoryFilter("");
-                  setAccountFilter("");
-                  setSourceFilter("");
-                  setClassifiedByFilter("");
+                  setCategoryFilter([]);
+                  setAccountFilter([]);
+                  setSourceFilter([]);
+                  setClassifiedByFilter([]);
                   setMinAmount("");
                   setMaxAmount("");
                   setStartDate(format(subMonths(new Date(), 3), "yyyy-MM-dd"));
