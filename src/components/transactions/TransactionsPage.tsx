@@ -103,6 +103,31 @@ export function Component() {
     !!searchParams.get("categoryId") || !!initialAmountType
   );
 
+  // Sync URL search params into state when they change (e.g. navigating from dashboard)
+  useEffect(() => {
+    const urlSearch = searchParams.get("search") ?? "";
+    const urlCategory = searchParams.get("categoryId");
+    const urlAmountType = searchParams.get("amountType");
+
+    if (urlSearch) {
+      setSearch(urlSearch);
+      setDebouncedSearch(urlSearch);
+    }
+    if (urlCategory) {
+      setCategoryFilter([urlCategory]);
+      setShowFilters(true);
+    }
+    if (urlAmountType === "income") {
+      setMaxAmount("-0.01");
+      setMinAmount("");
+      setShowFilters(true);
+    } else if (urlAmountType === "expenses") {
+      setMinAmount("0.01");
+      setMaxAmount("");
+      setShowFilters(true);
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(timer);
