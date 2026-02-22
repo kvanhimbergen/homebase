@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/popover";
 import { AddTransactionDialog } from "./AddTransactionDialog";
 import { CSVImportDialog } from "./CSVImportDialog";
+import { QFXImportDialog } from "./QFXImportDialog";
 import { SplitTransactionDialog } from "./SplitTransactionDialog";
 import {
   useTransactions,
@@ -216,6 +217,7 @@ export function Component() {
             Classify
           </Button>
           <CSVImportDialog />
+          <QFXImportDialog />
           <div data-add-transaction>
             <AddTransactionDialog />
           </div>
