@@ -31,6 +31,7 @@ export function ReceiptScanDialog({
   const [scanId, setScanId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const uploadMutation = useUploadAndProcessReceipt();
   const { data: scan } = useReceiptScan(scanId);
@@ -120,14 +121,36 @@ export function ReceiptScanDialog({
             <p className="text-xs text-muted-foreground mb-4">
               JPG, PNG, or PDF up to 10MB
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadMutation.isPending}
-            >
-              Choose File
-            </Button>
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={uploadMutation.isPending}
+              >
+                <Camera className="h-4 w-4 mr-1" />
+                Take Photo
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadMutation.isPending}
+              >
+                Choose File
+              </Button>
+            </div>
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFile(file);
+              }}
+            />
             <input
               ref={fileInputRef}
               type="file"
