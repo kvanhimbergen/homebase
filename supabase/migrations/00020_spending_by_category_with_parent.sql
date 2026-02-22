@@ -1,4 +1,5 @@
 -- Replace spending_by_category to include parent_id and filter out transfers
+drop function if exists public.spending_by_category(uuid, date, date);
 create or replace function public.spending_by_category(
   p_household_id uuid,
   p_start date,

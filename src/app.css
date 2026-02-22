@@ -68,6 +68,20 @@
   --color-category-18: oklch(0.55 0.12 280);
   --color-category-19: oklch(0.66 0.2 190);
 
+  /* Document category palette (12 colors) */
+  --color-doc-category-1: oklch(0.60 0.16 30);
+  --color-doc-category-2: oklch(0.62 0.18 150);
+  --color-doc-category-3: oklch(0.55 0.14 260);
+  --color-doc-category-4: oklch(0.65 0.17 210);
+  --color-doc-category-5: oklch(0.58 0.15 290);
+  --color-doc-category-6: oklch(0.68 0.16 170);
+  --color-doc-category-7: oklch(0.56 0.20 340);
+  --color-doc-category-8: oklch(0.70 0.14 80);
+  --color-doc-category-9: oklch(0.63 0.19 50);
+  --color-doc-category-10: oklch(0.57 0.12 230);
+  --color-doc-category-11: oklch(0.66 0.15 120);
+  --color-doc-category-12: oklch(0.60 0.13 190);
+
   --radius-lg: 0.625rem;
   --radius-md: calc(var(--radius-lg) - 2px);
   --radius-sm: calc(var(--radius-lg) - 4px);

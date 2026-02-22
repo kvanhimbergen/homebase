@@ -460,6 +460,50 @@ export interface Database {
           },
         ];
       };
+      document_categories: {
+        Row: {
+          id: string;
+          household_id: string;
+          name: string;
+          icon: string | null;
+          color: string | null;
+          parent_id: string | null;
+          is_system: boolean;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          household_id: string;
+          name: string;
+          icon?: string | null;
+          color?: string | null;
+          parent_id?: string | null;
+          is_system?: boolean;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          household_id?: string;
+          name?: string;
+          icon?: string | null;
+          color?: string | null;
+          parent_id?: string | null;
+          is_system?: boolean;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "document_categories_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       documents: {
         Row: {
           id: string;
@@ -471,6 +515,15 @@ export interface Database {
           tags: string[];
           expires_at: string | null;
           uploaded_by: string;
+          category_id: string | null;
+          member_id: string | null;
+          is_favorite: boolean;
+          version: number;
+          version_group_id: string;
+          is_latest_version: boolean;
+          document_year: number | null;
+          metadata: Json;
+          notes: string | null;
           created_at: string;
         };
         Insert: {
@@ -483,6 +536,15 @@ export interface Database {
           tags?: string[];
           expires_at?: string | null;
           uploaded_by: string;
+          category_id?: string | null;
+          member_id?: string | null;
+          is_favorite?: boolean;
+          version?: number;
+          version_group_id?: string;
+          is_latest_version?: boolean;
+          document_year?: number | null;
+          metadata?: Json;
+          notes?: string | null;
           created_at?: string;
         };
         Update: {
@@ -495,6 +557,15 @@ export interface Database {
           tags?: string[];
           expires_at?: string | null;
           uploaded_by?: string;
+          category_id?: string | null;
+          member_id?: string | null;
+          is_favorite?: boolean;
+          version?: number;
+          version_group_id?: string;
+          is_latest_version?: boolean;
+          document_year?: number | null;
+          metadata?: Json;
+          notes?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -503,6 +574,13 @@ export interface Database {
             columns: ["household_id"];
             isOneToOne: false;
             referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "documents_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "document_categories";
             referencedColumns: ["id"];
           },
         ];
