@@ -31,8 +31,10 @@ import {
 import { useHousehold } from "@/hooks/useHousehold";
 import { useAuth } from "@/hooks/useAuth";
 import { InviteMemberDialog } from "@/components/household/InviteMemberDialog";
+import { backfillSubcategories } from "@/services/household";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { CATEGORY_COLORS } from "@/lib/constants";
 
 export function Component() {
@@ -163,9 +165,29 @@ function CategoriesSettings() {
   const { data: categories } = useCategories();
   const categoryTree = useCategoryTree();
   const deleteCategory = useDeleteCategory();
+  const { currentHouseholdId } = useHousehold();
+  const queryClient = useQueryClient();
+  const [backfilling, setBackfilling] = useState(false);
 
   const customCategories = categories?.filter((c) => !c.is_system) ?? [];
   const systemTree = categoryTree.filter((n) => n.parent.is_system);
+  const hasSubcategories = categories?.some((c) => c.parent_id) ?? false;
+
+  async function handleBackfill() {
+    if (!currentHouseholdId) return;
+    setBackfilling(true);
+    try {
+      const result = await backfillSubcategories(currentHouseholdId);
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      toast.success(
+        `Added ${result.parentsAdded} categories and ${result.subcategoriesAdded} subcategories`
+      );
+    } catch {
+      toast.error("Failed to add subcategories");
+    } finally {
+      setBackfilling(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -218,8 +240,18 @@ function CategoriesSettings() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">System Categories</CardTitle>
+          {!hasSubcategories && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBackfill}
+              disabled={backfilling}
+            >
+              {backfilling ? "Adding..." : "Add Subcategories"}
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="space-y-1">
