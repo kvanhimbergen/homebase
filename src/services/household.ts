@@ -78,6 +78,7 @@ export async function seedDefaultCategories(householdId: string) {
     { name: "Personal Care", icon: "scissors", color: "var(--color-category-10)" },
     { name: "Income", icon: "wallet", color: "var(--color-category-11)" },
     { name: "Savings & Investments", icon: "trending-up", color: "var(--color-category-12)" },
+    { name: "Transfer", icon: "arrow-left-right", color: "var(--color-category-13)" },
   ];
 
   const { error } = await supabase.from("categories").insert(

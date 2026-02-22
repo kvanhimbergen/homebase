@@ -19,6 +19,7 @@ export interface TransactionFilters {
   classifiedByList?: ("user" | "ai" | "plaid" | "none")[];
   minAmount?: number;
   maxAmount?: number;
+  hasCheckNumber?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -69,6 +70,9 @@ export async function getTransactions(filters: TransactionFilters) {
     } else {
       query = query.in("classified_by", others);
     }
+  }
+  if (filters.hasCheckNumber) {
+    query = query.not("check_number", "is", null);
   }
   if (filters.minAmount != null) {
     query = query.gte("amount", filters.minAmount);
@@ -162,6 +166,7 @@ export async function getCashFlow(
     .select("amount")
     .eq("household_id", householdId)
     .eq("is_split", false)
+    .eq("is_transfer", false)
     .gte("date", start)
     .lte("date", end);
 
@@ -193,6 +198,7 @@ export async function getMultiMonthCashFlow(
     .select("date, amount")
     .eq("household_id", householdId)
     .eq("is_split", false)
+    .eq("is_transfer", false)
     .gte("date", start)
     .lte("date", end);
 
@@ -223,4 +229,73 @@ export async function getMultiMonthCashFlow(
     const bucket = buckets.get(key)!;
     return { month: format(m, "MMM"), income: bucket.income, expenses: bucket.expenses };
   });
+}
+
+export async function linkTransferPair(txnIdA: string, txnIdB: string) {
+  // Look up one of the transactions to get the household_id
+  const { data: txnA, error: fetchError } = await supabase
+    .from("transactions")
+    .select("household_id")
+    .eq("id", txnIdA)
+    .single();
+  if (fetchError || !txnA) throw fetchError ?? new Error("Transaction not found");
+
+  // Find the household's Transfer category
+  const { data: transferCat, error: catError } = await supabase
+    .from("categories")
+    .select("id")
+    .eq("household_id", txnA.household_id)
+    .eq("name", "Transfer")
+    .single();
+  if (catError || !transferCat) throw catError ?? new Error("Transfer category not found");
+
+  // Update both transactions
+  const updates = {
+    is_transfer: true,
+    category_id: transferCat.id,
+    classified_by: "user" as const,
+  };
+
+  const { error: errA } = await supabase
+    .from("transactions")
+    .update({ ...updates, transfer_pair_id: txnIdB })
+    .eq("id", txnIdA);
+  if (errA) throw errA;
+
+  const { error: errB } = await supabase
+    .from("transactions")
+    .update({ ...updates, transfer_pair_id: txnIdA })
+    .eq("id", txnIdB);
+  if (errB) throw errB;
+}
+
+export async function unlinkTransferPair(txnId: string) {
+  // Get the paired transaction id
+  const { data: txn, error: fetchError } = await supabase
+    .from("transactions")
+    .select("transfer_pair_id")
+    .eq("id", txnId)
+    .single();
+  if (fetchError || !txn) throw fetchError ?? new Error("Transaction not found");
+
+  const clearData = {
+    transfer_pair_id: null,
+    is_transfer: false,
+    category_id: null,
+    classified_by: null,
+  };
+
+  const { error: errA } = await supabase
+    .from("transactions")
+    .update(clearData)
+    .eq("id", txnId);
+  if (errA) throw errA;
+
+  if (txn.transfer_pair_id) {
+    const { error: errB } = await supabase
+      .from("transactions")
+      .update(clearData)
+      .eq("id", txn.transfer_pair_id);
+    if (errB) throw errB;
+  }
 }

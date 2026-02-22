@@ -68,6 +68,7 @@ export function QFXImportDialog() {
           date: txn.date,
           source: "ofx",
           import_hash: `ofx:${txn.fitId}`,
+          check_number: txn.checkNum || null,
         });
         imported++;
       } catch {
@@ -132,6 +133,9 @@ export function QFXImportDialog() {
                       <TableHead className="text-xs">Date</TableHead>
                       <TableHead className="text-xs">Name</TableHead>
                       <TableHead className="text-xs">Type</TableHead>
+                      {transactions.some((t) => t.checkNum) && (
+                        <TableHead className="text-xs">Check #</TableHead>
+                      )}
                       <TableHead className="text-xs text-right">
                         Amount
                       </TableHead>
@@ -145,6 +149,11 @@ export function QFXImportDialog() {
                           {txn.name}
                         </TableCell>
                         <TableCell className="text-xs">{txn.type}</TableCell>
+                        {transactions.some((t) => t.checkNum) && (
+                          <TableCell className="text-xs">
+                            {txn.checkNum || "\u2014"}
+                          </TableCell>
+                        )}
                         <TableCell className="text-xs text-right tabular-nums">
                           {txn.amount < 0 ? "+" : "-"}
                           {formatCurrency(Math.abs(txn.amount))}

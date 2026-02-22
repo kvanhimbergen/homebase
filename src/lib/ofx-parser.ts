@@ -5,6 +5,7 @@ export interface OFXTransaction {
   name: string;
   memo: string;
   type: string;
+  checkNum: string;
 }
 
 function extractTag(block: string, tag: string): string {
@@ -38,6 +39,7 @@ export function parseOFX(text: string): OFXTransaction[] {
     const name = extractTag(block, "NAME");
     const memo = extractTag(block, "MEMO");
     const trnType = extractTag(block, "TRNTYPE");
+    const checkNum = extractTag(block, "CHECKNUM");
 
     if (!fitId || !dtPosted || !trnAmt) continue;
 
@@ -53,6 +55,7 @@ export function parseOFX(text: string): OFXTransaction[] {
       name: name || memo,
       memo,
       type: trnType,
+      checkNum,
     });
   }
 

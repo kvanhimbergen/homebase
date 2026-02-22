@@ -9,6 +9,8 @@ import {
   createTransaction,
   updateTransaction,
   deleteTransactions,
+  linkTransferPair,
+  unlinkTransferPair,
   type TransactionFilters,
 } from "@/services/transactions";
 import { classifyTransactions } from "@/services/ai";
@@ -110,6 +112,37 @@ export function useDeleteTransactions() {
       queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["spending-by-category"] });
       queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
+    },
+  });
+}
+
+export function useLinkTransferPair() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ txnIdA, txnIdB }: { txnIdA: string; txnIdB: string }) =>
+      linkTransferPair(txnIdA, txnIdB),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["spending-by-category"] });
+      queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
+      queryClient.invalidateQueries({ queryKey: ["credit-card-payments"] });
+    },
+  });
+}
+
+export function useUnlinkTransferPair() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (txnId: string) => unlinkTransferPair(txnId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["spending-by-category"] });
+      queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
+      queryClient.invalidateQueries({ queryKey: ["credit-card-payments"] });
     },
   });
 }

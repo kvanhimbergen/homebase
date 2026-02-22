@@ -55,6 +55,7 @@
   --color-category-10: oklch(0.554 0.135 163.225);
   --color-category-11: oklch(0.748 0.26 342.708);
   --color-category-12: oklch(0.558 0.288 302.321);
+  --color-category-13: oklch(0.65 0.15 220);
 
   --radius-lg: 0.5rem;
   --radius-md: calc(var(--radius-lg) - 2px);

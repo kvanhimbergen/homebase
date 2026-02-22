@@ -84,3 +84,47 @@ export async function getAccountBalanceSummary(householdId: string) {
 
   return summary;
 }
+
+export async function getCreditCardPayments(householdId: string) {
+  // Get all credit-type account IDs
+  const { data: creditAccounts, error: accError } = await supabase
+    .from("accounts")
+    .select("id, name, balance_current")
+    .eq("household_id", householdId)
+    .eq("type", "credit");
+
+  if (accError) throw accError;
+  if (!creditAccounts || creditAccounts.length === 0) return [];
+
+  const accountIds = creditAccounts.map((a) => a.id);
+
+  // Get transfer-linked transactions for these accounts
+  const { data: payments, error: payError } = await supabase
+    .from("transactions")
+    .select("*, accounts(*)")
+    .eq("is_transfer", true)
+    .in("account_id", accountIds)
+    .order("date", { ascending: false })
+    .limit(20);
+
+  if (payError) throw payError;
+
+  return creditAccounts.map((account) => {
+    const accountPayments = (payments ?? []).filter(
+      (p) => p.account_id === account.id
+    );
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      .toISOString()
+      .slice(0, 10);
+    const monthTotal = accountPayments
+      .filter((p) => p.date >= monthStart)
+      .reduce((sum, p) => sum + Math.abs(p.amount), 0);
+
+    return {
+      account,
+      payments: accountPayments.slice(0, 3) as (Tables<"transactions"> & { accounts: Tables<"accounts"> | null })[],
+      monthTotal,
+    };
+  });
+}

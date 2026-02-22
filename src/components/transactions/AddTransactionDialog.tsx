@@ -33,6 +33,7 @@ export function AddTransactionDialog() {
   const [categoryId, setCategoryId] = useState("");
   const [accountId, setAccountId] = useState("");
   const [notes, setNotes] = useState("");
+  const [checkNumber, setCheckNumber] = useState("");
   const [isExpense, setIsExpense] = useState(true);
 
   const { currentHouseholdId } = useHousehold();
@@ -47,6 +48,7 @@ export function AddTransactionDialog() {
     setCategoryId("");
     setAccountId("");
     setNotes("");
+    setCheckNumber("");
     setIsExpense(true);
   }
 
@@ -66,6 +68,7 @@ export function AddTransactionDialog() {
         category_id: categoryId || null,
         account_id: accountId || null,
         notes: notes || null,
+        check_number: checkNumber || null,
         source: "manual",
       });
       toast.success("Transaction added");
@@ -185,6 +188,16 @@ export function AddTransactionDialog() {
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional notes"
               rows={2}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="txn-check">Check # (optional)</Label>
+            <Input
+              id="txn-check"
+              value={checkNumber}
+              onChange={(e) => setCheckNumber(e.target.value)}
+              placeholder="e.g. 1234"
             />
           </div>
 

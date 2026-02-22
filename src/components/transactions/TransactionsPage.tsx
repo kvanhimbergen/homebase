@@ -13,6 +13,8 @@ import {
   ArrowDown,
   ArrowUpDown,
   ChevronDown,
+  ArrowLeftRight,
+  Unlink,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,6 +51,8 @@ import {
   useUpdateTransaction,
   useDeleteTransactions,
   useClassifyTransactions,
+  useLinkTransferPair,
+  useUnlinkTransferPair,
 } from "@/hooks/useTransactions";
 import { useCategories } from "@/hooks/useCategories";
 import { useAccounts } from "@/hooks/useAccounts";
@@ -83,6 +87,7 @@ export function Component() {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [splitTxn, setSplitTxn] = useState<Tables<"transactions"> | null>(null);
+  const [checksOnly, setChecksOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(!!searchParams.get("categoryId"));
 
   useEffect(() => {
@@ -93,7 +98,7 @@ export function Component() {
   // Reset to first page when any filter or sort changes
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, categoryFilter, accountFilter, startDate, endDate, sortBy, sortDirection, sourceFilter, classifiedByFilter, minAmount, maxAmount]);
+  }, [debouncedSearch, categoryFilter, accountFilter, startDate, endDate, sortBy, sortDirection, sourceFilter, classifiedByFilter, minAmount, maxAmount, checksOnly]);
 
   const parsedMin = minAmount !== "" ? parseFloat(minAmount) : undefined;
   const parsedMax = maxAmount !== "" ? parseFloat(maxAmount) : undefined;
@@ -110,6 +115,7 @@ export function Component() {
     classifiedByList: classifiedByFilter.length > 0 ? classifiedByFilter as ("user" | "ai" | "plaid" | "none")[] : undefined,
     minAmount: parsedMin != null && !isNaN(parsedMin) ? parsedMin : undefined,
     maxAmount: parsedMax != null && !isNaN(parsedMax) ? parsedMax : undefined,
+    hasCheckNumber: checksOnly || undefined,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
   });
@@ -119,6 +125,8 @@ export function Component() {
   const updateTxn = useUpdateTransaction();
   const deleteTxns = useDeleteTransactions();
   const classifyTxns = useClassifyTransactions();
+  const linkTransfer = useLinkTransferPair();
+  const unlinkTransfer = useUnlinkTransferPair();
 
   const transactions = result?.data ?? [];
   const totalCount = result?.count ?? 0;
@@ -182,6 +190,27 @@ export function Component() {
       setSelected(new Set());
     } catch {
       toast.error("Failed to delete transactions");
+    }
+  }
+
+  async function handleMarkAsTransfer() {
+    const ids = Array.from(selected);
+    if (ids.length !== 2) return;
+    try {
+      await linkTransfer.mutateAsync({ txnIdA: ids[0], txnIdB: ids[1] });
+      toast.success("Marked as transfer pair");
+      setSelected(new Set());
+    } catch {
+      toast.error("Failed to link transfer pair");
+    }
+  }
+
+  async function handleUnlinkTransfer(txnId: string) {
+    try {
+      await unlinkTransfer.mutateAsync(txnId);
+      toast.success("Transfer unlinked");
+    } catch {
+      toast.error("Failed to unlink transfer");
     }
   }
 
@@ -462,6 +491,13 @@ export function Component() {
                   className="w-24 h-9 text-sm"
                 />
               </div>
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <Checkbox
+                  checked={checksOnly}
+                  onCheckedChange={(checked) => setChecksOnly(!!checked)}
+                />
+                Checks only
+              </label>
               <Button
                 variant="ghost"
                 size="sm"
@@ -472,6 +508,7 @@ export function Component() {
                   setClassifiedByFilter([]);
                   setMinAmount("");
                   setMaxAmount("");
+                  setChecksOnly(false);
                   setStartDate(format(subMonths(new Date(), 3), "yyyy-MM-dd"));
                   setEndDate(format(new Date(), "yyyy-MM-dd"));
                   setSortBy("date");
@@ -508,6 +545,11 @@ export function Component() {
               ))}
             </PopoverContent>
           </Popover>
+          {selected.size === 2 && (
+            <Button variant="outline" size="sm" onClick={handleMarkAsTransfer}>
+              <ArrowLeftRight className="h-3 w-3 mr-1" /> Mark as Transfer
+            </Button>
+          )}
           <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
             <Trash2 className="h-3 w-3 mr-1" /> Delete
           </Button>
@@ -624,6 +666,17 @@ export function Component() {
                               {Math.round(txn.ai_category_confidence * 100)}%
                             </Badge>
                           )}
+                        {txn.is_transfer && (
+                          <Badge variant="outline" className="text-[10px] h-4 border-blue-500/50 text-blue-600">
+                            <ArrowLeftRight className="h-2.5 w-2.5 mr-0.5" />
+                            Transfer
+                          </Badge>
+                        )}
+                        {txn.check_number && (
+                          <Badge variant="outline" className="text-[10px] h-4">
+                            Check #{txn.check_number}
+                          </Badge>
+                        )}
                         {txn.source !== "manual" && txn.source !== "plaid" && (
                           <Badge variant="outline" className="text-[10px] h-4">
                             {txn.source}
@@ -650,15 +703,28 @@ export function Component() {
                       {formatCurrency(Math.abs(txn.amount))}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 opacity-0 group-hover:opacity-100"
-                        onClick={() => setSplitTxn(txn)}
-                        title="Split transaction"
-                      >
-                        <Scissors className="h-3 w-3" />
-                      </Button>
+                      <div className="flex items-center">
+                        {txn.is_transfer && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                            onClick={() => handleUnlinkTransfer(txn.id)}
+                            title="Unlink transfer"
+                          >
+                            <Unlink className="h-3 w-3" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                          onClick={() => setSplitTxn(txn)}
+                          title="Split transaction"
+                        >
+                          <Scissors className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

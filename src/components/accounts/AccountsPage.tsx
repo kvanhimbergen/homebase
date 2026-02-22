@@ -36,6 +36,7 @@ import {
   useAccountBalanceSummary,
   useCreateAccount,
   useUpdateAccount,
+  useCreditCardPayments,
 } from "@/hooks/useAccounts";
 import { useHousehold } from "@/hooks/useHousehold";
 import {
@@ -66,8 +67,10 @@ export function Component() {
   const updateAccount = useUpdateAccount();
   const canManagePlaid = currentRole === "owner" || currentRole === "admin";
 
+  const { data: ccPayments } = useCreditCardPayments();
   const visibleAccounts = accounts?.filter((a) => !a.is_hidden) ?? [];
   const hiddenAccounts = accounts?.filter((a) => a.is_hidden) ?? [];
+  const hasCreditAccounts = accounts?.some((a) => a.type === "credit") ?? false;
 
   async function toggleHidden(id: string, currentlyHidden: boolean) {
     try {
@@ -261,6 +264,60 @@ export function Component() {
                   >
                     <Eye className="h-3.5 w-3.5" />
                   </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Credit Card Payments */}
+      {hasCreditAccounts && ccPayments && ccPayments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Credit Card Payments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {ccPayments.map(({ account, payments, monthTotal }) => (
+                <div
+                  key={account.id}
+                  className="border rounded-lg p-4 space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-orange-500" />
+                      <span className="text-sm font-medium">{account.name}</span>
+                    </div>
+                    <span className="text-sm font-semibold tabular-nums text-expense">
+                      {formatCurrency(account.balance_current ?? 0)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Payments this month:{" "}
+                    <span className="font-medium text-foreground">
+                      {formatCurrency(monthTotal)}
+                    </span>
+                  </div>
+                  {payments.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {payments.map((p) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center justify-between text-xs"
+                        >
+                          <span className="text-muted-foreground">{p.date}</span>
+                          <span className="font-medium tabular-nums">
+                            {formatCurrency(Math.abs(p.amount))}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      No transfer-linked payments yet.
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

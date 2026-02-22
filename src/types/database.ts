@@ -298,6 +298,9 @@ export interface Database {
           is_split: boolean;
           parent_transaction_id: string | null;
           import_hash: string | null;
+          transfer_pair_id: string | null;
+          is_transfer: boolean;
+          check_number: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -318,6 +321,9 @@ export interface Database {
           is_split?: boolean;
           parent_transaction_id?: string | null;
           import_hash?: string | null;
+          transfer_pair_id?: string | null;
+          is_transfer?: boolean;
+          check_number?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -338,6 +344,9 @@ export interface Database {
           is_split?: boolean;
           parent_transaction_id?: string | null;
           import_hash?: string | null;
+          transfer_pair_id?: string | null;
+          is_transfer?: boolean;
+          check_number?: string | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -5,6 +5,7 @@ import {
   updateAccount,
   deleteAccount,
   getAccountBalanceSummary,
+  getCreditCardPayments,
 } from "@/services/accounts";
 import type { InsertTables, UpdateTables } from "@/types/database";
 import { useHousehold } from "./useHousehold";
@@ -63,5 +64,15 @@ export function useDeleteAccount() {
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       queryClient.invalidateQueries({ queryKey: ["account-balance-summary"] });
     },
+  });
+}
+
+export function useCreditCardPayments() {
+  const { currentHouseholdId } = useHousehold();
+
+  return useQuery({
+    queryKey: ["credit-card-payments", currentHouseholdId],
+    queryFn: () => getCreditCardPayments(currentHouseholdId!),
+    enabled: !!currentHouseholdId,
   });
 }
