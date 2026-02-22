@@ -19,9 +19,11 @@ interface CashFlowDataPoint {
 export function CashFlowBar({
   data,
   height = 300,
+  onBarClick,
 }: {
   data: CashFlowDataPoint[];
   height?: number;
+  onBarClick?: (month: string, type: "income" | "expenses") => void;
 }) {
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -62,12 +64,16 @@ export function CashFlowBar({
           name="Income"
           fill="var(--color-income)"
           radius={[4, 4, 0, 0]}
+          className={onBarClick ? "cursor-pointer" : ""}
+          onClick={(data) => onBarClick?.((data as unknown as CashFlowDataPoint).month, "income")}
         />
         <Bar
           dataKey="expenses"
           name="Expenses"
           fill="var(--color-expense)"
           radius={[4, 4, 0, 0]}
+          className={onBarClick ? "cursor-pointer" : ""}
+          onClick={(data) => onBarClick?.((data as unknown as CashFlowDataPoint).month, "expenses")}
         />
       </BarChart>
     </ResponsiveContainer>

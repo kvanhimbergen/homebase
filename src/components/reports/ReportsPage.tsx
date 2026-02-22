@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   format,
+  parse,
   startOfMonth,
   endOfMonth,
   subMonths,
@@ -77,6 +78,13 @@ export function Component() {
     setSelectedParentId(null);
     setSelectedParentName(null);
     setHoveredCategoryId(null);
+  }
+
+  function handleCashFlowBarClick(month: string, type: "income" | "expenses") {
+    const parsed = parse(month, "MMM yy", new Date());
+    const s = format(startOfMonth(parsed), "yyyy-MM-dd");
+    const e = format(endOfMonth(parsed), "yyyy-MM-dd");
+    navigate(`/transactions?amountType=${type}&startDate=${s}&endDate=${e}`);
   }
 
   // Monthly cash flow data for bar chart
@@ -267,7 +275,7 @@ export function Component() {
               <CardTitle className="text-base">Cash Flow Over Time</CardTitle>
             </CardHeader>
             <CardContent>
-              <CashFlowBarFetcher months={monthlyQueries} />
+              <CashFlowBarFetcher months={monthlyQueries} onBarClick={handleCashFlowBarClick} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -310,8 +318,10 @@ export function Component() {
 
 function CashFlowBarFetcher({
   months,
+  onBarClick,
 }: {
   months: { month: string; start: string; end: string }[];
+  onBarClick?: (month: string, type: "income" | "expenses") => void;
 }) {
   const { currentHouseholdId } = useHousehold();
   const [data, setData] = useState<
@@ -351,7 +361,7 @@ function CashFlowBarFetcher({
   if (data.every((d) => d.income === 0 && d.expenses === 0))
     return <EmptyState />;
 
-  return <CashFlowBar data={data} />;
+  return <CashFlowBar data={data} onBarClick={onBarClick} />;
 }
 
 function CategoryTrendsFetcher({

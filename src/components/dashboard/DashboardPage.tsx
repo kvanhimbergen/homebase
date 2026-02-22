@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
+import { format, parse, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
 import {
   ChevronLeft,
   ChevronRight,
@@ -94,6 +94,13 @@ export function Component() {
     setHoveredCategoryId(null);
   }
 
+  function handleCashFlowBarClick(month: string, type: "income" | "expenses") {
+    const parsed = parse(month, "MMM yy", new Date());
+    const start = format(startOfMonth(parsed), "yyyy-MM-dd");
+    const end = format(endOfMonth(parsed), "yyyy-MM-dd");
+    navigate(`/transactions?amountType=${type}&startDate=${start}&endDate=${end}`);
+  }
+
   return (
     <div className="space-y-6">
       {/* Header + Month Selector */}
@@ -168,7 +175,7 @@ export function Component() {
             {multiMonthLoading ? (
               <Skeleton className="h-[300px] w-full" />
             ) : multiMonthData && multiMonthData.length > 0 ? (
-              <CashFlowBar data={multiMonthData} height={300} />
+              <CashFlowBar data={multiMonthData} height={300} onBarClick={handleCashFlowBarClick} />
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <BarChart3 className="h-12 w-12 text-muted-foreground/30 mb-3" />
