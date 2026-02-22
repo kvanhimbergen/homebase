@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Download,
   Trash2,
@@ -76,18 +76,18 @@ export function DocumentPreviewPanel({
   const toggleFav = useToggleFavorite();
   const uploadVersion = useUploadNewVersion();
 
-  // Track doc id to reset state when document changes
-  const prevDocId = useRef<string | null>(null);
-  if (doc?.id !== prevDocId.current) {
-    prevDocId.current = doc?.id ?? null;
+  // Reset state when document changes
+  const docId = doc?.id ?? null;
+  useEffect(() => {
+    setIsEditing(false);
+    setShowVersions(false);
     if (doc) {
       getDocumentUrl(doc.storage_path).then(setPreviewUrl);
     } else {
       setPreviewUrl("");
     }
-    setIsEditing(false);
-    setShowVersions(false);
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docId]);
 
   function startEditing() {
     if (!doc) return;
