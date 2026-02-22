@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   format,
   startOfMonth,
@@ -22,6 +23,7 @@ import { formatCurrency } from "@/lib/formatters";
 import { supabase } from "@/lib/supabase";
 
 export function Component() {
+  const navigate = useNavigate();
   const [startDate, setStartDate] = useState(
     format(subMonths(new Date(), 5), "yyyy-MM-dd")
   );
@@ -44,6 +46,38 @@ export function Component() {
 
   const totalSpent =
     spending?.reduce((sum, s) => sum + Math.abs(s.total), 0) ?? 0;
+
+  // Drill-down + hover state
+  const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
+  const [selectedParentName, setSelectedParentName] = useState<string | null>(null);
+  const [hoveredCategoryId, setHoveredCategoryId] = useState<string | null>(null);
+
+  // Reset drill-down when date range changes
+  const dateKey = `${currentStart}-${currentEnd}`;
+  const [prevDateKey, setPrevDateKey] = useState(dateKey);
+  if (dateKey !== prevDateKey) {
+    setPrevDateKey(dateKey);
+    setSelectedParentId(null);
+    setSelectedParentName(null);
+    setHoveredCategoryId(null);
+  }
+
+  function handleCategoryClick(categoryId: string, hasCategoryChildren: boolean) {
+    if (hasCategoryChildren && !selectedParentId) {
+      const parentItem = spending?.find((s) => s.category_id === categoryId);
+      setSelectedParentId(categoryId);
+      setSelectedParentName(parentItem?.category_name ?? null);
+      setHoveredCategoryId(null);
+    } else {
+      navigate(`/transactions?categoryId=${categoryId}`);
+    }
+  }
+
+  function handleCategoryBack() {
+    setSelectedParentId(null);
+    setSelectedParentName(null);
+    setHoveredCategoryId(null);
+  }
 
   // Monthly cash flow data for bar chart
   const { currentHouseholdId } = useHousehold();
@@ -152,9 +186,24 @@ export function Component() {
                   <Skeleton className="h-[280px] w-full" />
                 ) : spending && spending.length > 0 ? (
                   <>
-                    <SpendingDonut data={spending} total={totalSpent} />
+                    <SpendingDonut
+                      data={spending}
+                      total={totalSpent}
+                      onCategoryClick={handleCategoryClick}
+                      selectedParentId={selectedParentId}
+                      selectedParentName={selectedParentName}
+                      onBack={handleCategoryBack}
+                      hoveredCategoryId={hoveredCategoryId}
+                      onHoverCategory={setHoveredCategoryId}
+                    />
                     <div className="mt-4">
-                      <SpendingLegend data={spending} />
+                      <SpendingLegend
+                        data={spending}
+                        onCategoryClick={handleCategoryClick}
+                        selectedParentId={selectedParentId}
+                        hoveredCategoryId={hoveredCategoryId}
+                        onHoverCategory={setHoveredCategoryId}
+                      />
                     </div>
                   </>
                 ) : (
@@ -175,13 +224,19 @@ export function Component() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center py-3 border-b">
+                    <div
+                      className="flex justify-between items-center py-3 border-b cursor-pointer hover:bg-muted/50 rounded-md px-2 -mx-2 transition-colors"
+                      onClick={() => navigate("/transactions?amountType=income")}
+                    >
                       <span className="text-sm">Income</span>
                       <span className="text-sm font-semibold text-income tabular-nums">
                         {formatCurrency(cashFlow?.income ?? 0)}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center py-3 border-b">
+                    <div
+                      className="flex justify-between items-center py-3 border-b cursor-pointer hover:bg-muted/50 rounded-md px-2 -mx-2 transition-colors"
+                      onClick={() => navigate("/transactions?amountType=expenses")}
+                    >
                       <span className="text-sm">Expenses</span>
                       <span className="text-sm font-semibold text-expense tabular-nums">
                         {formatCurrency(cashFlow?.expenses ?? 0)}
