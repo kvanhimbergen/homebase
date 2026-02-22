@@ -231,6 +231,38 @@ export async function getMultiMonthCashFlow(
   });
 }
 
+export interface DailySpending {
+  date: string;
+  amount: number;
+}
+
+export async function getDailySpending(
+  householdId: string,
+  start: string,
+  end: string
+): Promise<DailySpending[]> {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("date, amount")
+    .eq("household_id", householdId)
+    .eq("is_split", false)
+    .eq("is_transfer", false)
+    .gt("amount", 0)
+    .gte("date", start)
+    .lte("date", end);
+
+  if (error) throw error;
+
+  const byDate = new Map<string, number>();
+  for (const txn of data) {
+    byDate.set(txn.date, (byDate.get(txn.date) ?? 0) + txn.amount);
+  }
+
+  return Array.from(byDate.entries())
+    .map(([date, amount]) => ({ date, amount }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export async function linkTransferPair(txnIdA: string, txnIdB: string) {
   // Look up one of the transactions to get the household_id
   const { data: txnA, error: fetchError } = await supabase

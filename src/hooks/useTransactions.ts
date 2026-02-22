@@ -6,6 +6,7 @@ import {
   getSpendingByCategory,
   getCashFlow,
   getMultiMonthCashFlow,
+  getDailySpending,
   createTransaction,
   updateTransaction,
   deleteTransactions,
@@ -74,6 +75,16 @@ export function useMultiMonthCashFlow(currentDate: Date, monthsBack = 6) {
   });
 }
 
+export function useDailySpending(start: string, end: string) {
+  const { currentHouseholdId } = useHousehold();
+
+  return useQuery({
+    queryKey: ["daily-spending", currentHouseholdId, start, end],
+    queryFn: () => getDailySpending(currentHouseholdId!, start, end),
+    enabled: !!currentHouseholdId,
+  });
+}
+
 export function useCreateTransaction() {
   const queryClient = useQueryClient();
 
@@ -85,6 +96,7 @@ export function useCreateTransaction() {
       queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["spending-by-category"] });
       queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-spending"] });
     },
   });
 }
@@ -100,6 +112,7 @@ export function useUpdateTransaction() {
       queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["spending-by-category"] });
       queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-spending"] });
     },
   });
 }
@@ -114,6 +127,7 @@ export function useDeleteTransactions() {
       queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["spending-by-category"] });
       queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-spending"] });
     },
   });
 }
@@ -129,6 +143,7 @@ export function useLinkTransferPair() {
       queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["spending-by-category"] });
       queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-spending"] });
       queryClient.invalidateQueries({ queryKey: ["credit-card-payments"] });
     },
   });
@@ -144,6 +159,7 @@ export function useUnlinkTransferPair() {
       queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["spending-by-category"] });
       queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-spending"] });
       queryClient.invalidateQueries({ queryKey: ["credit-card-payments"] });
     },
   });
@@ -173,6 +189,7 @@ export function useClassifyTransactions() {
       queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["spending-by-category"] });
       queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-spending"] });
     },
   });
 }
