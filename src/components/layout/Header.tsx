@@ -27,12 +27,12 @@ export function Header() {
     "?";
 
   return (
-    <header className="h-14 border-b flex items-center justify-between px-4 bg-background">
+    <header className="h-14 border-b border-border/60 flex items-center justify-between px-4 md:px-6 bg-background">
       <div className="flex items-center gap-2">
         <MobileSidebar />
         {memberships.length > 1 && (
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-medium hover:text-foreground text-muted-foreground">
+            <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-semibold hover:text-foreground text-muted-foreground">
               {currentHousehold?.name ?? "Select household"}
               <ChevronDown className="h-4 w-4" />
             </DropdownMenuTrigger>
@@ -50,7 +50,7 @@ export function Header() {
           </DropdownMenu>
         )}
         {memberships.length <= 1 && currentHousehold && (
-          <span className="text-sm font-medium hidden md:inline">
+          <span className="text-sm font-semibold hidden md:inline">
             {currentHousehold.name}
           </span>
         )}
@@ -59,7 +59,7 @@ export function Header() {
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2">
           <Avatar className="h-8 w-8">
-            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+            <AvatarFallback className="text-xs bg-primary text-primary-foreground">{initials}</AvatarFallback>
           </Avatar>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
