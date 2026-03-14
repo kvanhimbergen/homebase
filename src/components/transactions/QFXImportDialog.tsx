@@ -116,11 +116,11 @@ export function QFXImportDialog() {
           Import QFX
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl overflow-hidden">
         <DialogHeader>
           <DialogTitle>Import from QFX/OFX</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           <div
             className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
             onClick={() => document.getElementById("qfx-input")?.click()}
@@ -140,7 +140,7 @@ export function QFXImportDialog() {
 
           {transactions.length > 0 && (
             <>
-              <div className="border rounded-md max-h-48 overflow-auto">
+              <div className="border rounded-md max-h-48 overflow-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
