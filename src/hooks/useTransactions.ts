@@ -16,9 +16,12 @@ import {
   type TransactionFilters,
   type TransferMatch,
 } from "@/services/transactions";
-import { classifyTransactions } from "@/services/ai";
+import { classifyTransactions, type ClassifyResult } from "@/services/ai";
+import { supabase } from "@/lib/supabase";
 import type { InsertTables, UpdateTables } from "@/types/database";
 import { useHousehold } from "./useHousehold";
+
+const CLASSIFY_BATCH_SIZE = 20;
 
 export function useTransactions(
   filters: Omit<TransactionFilters, "householdId">
@@ -180,9 +183,51 @@ export function useClassifyTransactions() {
   const { currentHouseholdId } = useHousehold();
 
   return useMutation({
-    mutationFn: () => {
+    mutationFn: async (opts?: {
+      transactionIds?: string[];
+      onProgress?: (done: number, total: number) => void;
+    }): Promise<ClassifyResult> => {
       if (!currentHouseholdId) throw new Error("No household selected");
-      return classifyTransactions(currentHouseholdId);
+
+      // If specific IDs given and small enough, send directly
+      if (opts?.transactionIds && opts.transactionIds.length <= CLASSIFY_BATCH_SIZE) {
+        return classifyTransactions(currentHouseholdId, opts.transactionIds);
+      }
+
+      // Get IDs to classify: either provided or fetch uncategorized
+      let ids = opts?.transactionIds;
+      if (!ids) {
+        const { data } = await supabase
+          .from("transactions")
+          .select("id")
+          .eq("household_id", currentHouseholdId)
+          .is("category_id", null)
+          .order("date", { ascending: false })
+          .limit(500);
+        ids = data?.map((t) => t.id) ?? [];
+      }
+
+      if (ids.length === 0) {
+        return { classified: 0, skipped: 0, errors: 0 };
+      }
+
+      // Process in batches with progress
+      const totals: ClassifyResult = { classified: 0, skipped: 0, errors: 0 };
+
+      for (let i = 0; i < ids.length; i += CLASSIFY_BATCH_SIZE) {
+        const batch = ids.slice(i, i + CLASSIFY_BATCH_SIZE);
+        try {
+          const result = await classifyTransactions(currentHouseholdId, batch);
+          totals.classified += result.classified;
+          totals.skipped += result.skipped;
+          totals.errors += result.errors;
+        } catch {
+          totals.errors += batch.length;
+        }
+        opts?.onProgress?.(Math.min(i + CLASSIFY_BATCH_SIZE, ids.length), ids.length);
+      }
+
+      return totals;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });

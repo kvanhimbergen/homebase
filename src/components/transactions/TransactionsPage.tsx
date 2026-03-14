@@ -222,17 +222,23 @@ export function Component() {
   }
 
   async function handleClassify() {
+    const toastId = toast.loading("Classifying transactions...");
     try {
-      const result = await classifyTxns.mutateAsync();
+      const result = await classifyTxns.mutateAsync({
+        onProgress: (done, total) => {
+          toast.loading(`Classifying... ${done}/${total}`, { id: toastId });
+        },
+      });
       if (result.classified === 0) {
-        toast.info("No uncategorized transactions to classify.");
+        toast.info("No uncategorized transactions to classify.", { id: toastId });
       } else {
         toast.success(
-          `Classified ${result.classified} transaction(s).${result.skipped ? ` ${result.skipped} skipped.` : ""}${result.errors ? ` ${result.errors} error(s).` : ""}`
+          `Classified ${result.classified} transaction(s).${result.skipped ? ` ${result.skipped} skipped.` : ""}${result.errors ? ` ${result.errors} error(s).` : ""}`,
+          { id: toastId }
         );
       }
     } catch {
-      toast.error("Failed to classify transactions");
+      toast.error("Failed to classify transactions", { id: toastId });
     }
   }
 

@@ -305,6 +305,91 @@ export type TransferMatch = Tables<"transactions"> & {
   accounts: Tables<"accounts"> | null;
 };
 
+/**
+ * Auto-detect and link transfer pairs from a set of newly imported transaction IDs.
+ * Scans each transaction for a matching opposite-amount transaction within ±7 days
+ * on a different account. Returns the number of pairs linked.
+ */
+export async function autoLinkTransfers(
+  householdId: string,
+  transactionIds: string[]
+): Promise<number> {
+  if (transactionIds.length === 0) return 0;
+
+  // Find the Transfer category
+  const { data: transferCat } = await supabase
+    .from("categories")
+    .select("id")
+    .eq("household_id", householdId)
+    .eq("name", "Transfer")
+    .single();
+  if (!transferCat) return 0;
+
+  // Fetch the newly imported transactions
+  const { data: newTxns } = await supabase
+    .from("transactions")
+    .select("id, amount, date, account_id, is_transfer")
+    .in("id", transactionIds);
+  if (!newTxns?.length) return 0;
+
+  let linked = 0;
+  const alreadyLinked = new Set<string>();
+
+  for (const txn of newTxns) {
+    if (txn.is_transfer || alreadyLinked.has(txn.id) || !txn.account_id) continue;
+
+    const targetAmount = -txn.amount;
+    const epsilon = 0.005;
+    const srcDate = parseISO(txn.date);
+    const minDate = format(new Date(srcDate.getTime() - 7 * 86400000), "yyyy-MM-dd");
+    const maxDate = format(new Date(srcDate.getTime() + 7 * 86400000), "yyyy-MM-dd");
+
+    const { data: matches } = await supabase
+      .from("transactions")
+      .select("id")
+      .eq("household_id", householdId)
+      .gte("amount", targetAmount - epsilon)
+      .lte("amount", targetAmount + epsilon)
+      .neq("account_id", txn.account_id)
+      .eq("is_transfer", false)
+      .eq("is_split", false)
+      .gte("date", minDate)
+      .lte("date", maxDate)
+      .neq("id", txn.id)
+      .limit(1);
+
+    if (!matches?.length) continue;
+
+    const matchId = matches[0].id;
+    if (alreadyLinked.has(matchId)) continue;
+
+    // Link the pair
+    const updates = {
+      is_transfer: true,
+      category_id: transferCat.id,
+      classified_by: "ai" as const,
+    };
+
+    const { error: errA } = await supabase
+      .from("transactions")
+      .update({ ...updates, transfer_pair_id: matchId })
+      .eq("id", txn.id);
+
+    const { error: errB } = await supabase
+      .from("transactions")
+      .update({ ...updates, transfer_pair_id: txn.id })
+      .eq("id", matchId);
+
+    if (!errA && !errB) {
+      linked++;
+      alreadyLinked.add(txn.id);
+      alreadyLinked.add(matchId);
+    }
+  }
+
+  return linked;
+}
+
 export async function findTransferMatches(
   txnId: string
 ): Promise<TransferMatch[]> {

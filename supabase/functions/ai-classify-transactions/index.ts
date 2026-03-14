@@ -2,7 +2,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-const BATCH_SIZE = 50;
 
 interface ClassifyResult {
   transaction_id: string;
@@ -52,7 +51,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { household_id } = await req.json();
+    const { household_id, transaction_ids } = await req.json();
     if (!household_id) {
       return new Response(
         JSON.stringify({ error: "household_id is required" }),
@@ -97,17 +96,62 @@ Deno.serve(async (req) => {
     }
 
     const categoryByName = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]));
+    const categoryById = new Map(categories.map((c) => [c.id, c.name]));
     const categoryNames = categories.map((c) => c.name);
 
-    // Fetch uncategorized transactions (skip user-classified ones)
-    const { data: transactions, error: txnError } = await adminClient
+    // Fetch recent user-classified transactions as few-shot examples
+    const { data: examples } = await adminClient
       .from("transactions")
-      .select("id, name, merchant_name, amount, date")
+      .select("name, merchant_name, amount, category_id")
       .eq("household_id", household_id)
-      .is("category_id", null)
-      .or("classified_by.is.null,classified_by.neq.user")
-      .order("date", { ascending: false })
-      .limit(500);
+      .eq("classified_by", "user")
+      .not("category_id", "is", null)
+      .order("updated_at", { ascending: false })
+      .limit(50);
+
+    // Deduplicate examples by merchant/name to get diverse coverage
+    const seenNames = new Set<string>();
+    const fewShotExamples: { name: string; merchant: string | null; amount: number; category: string }[] = [];
+    for (const ex of examples ?? []) {
+      const key = (ex.merchant_name ?? ex.name).toLowerCase();
+      if (seenNames.has(key)) continue;
+      seenNames.add(key);
+      const catName = categoryById.get(ex.category_id);
+      if (!catName) continue;
+      fewShotExamples.push({
+        name: ex.name,
+        merchant: ex.merchant_name,
+        amount: ex.amount,
+        category: catName,
+      });
+    }
+
+    // Load household accounts for context
+    const { data: accounts } = await adminClient
+      .from("accounts")
+      .select("id, name, type")
+      .eq("household_id", household_id);
+
+    const accountById = new Map((accounts ?? []).map((a) => [a.id, a]));
+
+    // Fetch transactions to classify
+    let query = adminClient
+      .from("transactions")
+      .select("id, name, merchant_name, amount, date, check_number, account_id")
+      .eq("household_id", household_id);
+
+    if (transaction_ids && Array.isArray(transaction_ids) && transaction_ids.length > 0) {
+      // Classify specific transactions by ID
+      query = query.in("id", transaction_ids);
+    } else {
+      // Legacy: find uncategorized transactions
+      query = query
+        .is("category_id", null)
+        .or("classified_by.is.null,classified_by.neq.user")
+        .limit(500);
+    }
+
+    const { data: transactions, error: txnError } = await query.order("date", { ascending: false });
 
     if (txnError) {
       return new Response(
@@ -130,20 +174,40 @@ Deno.serve(async (req) => {
     let skipped = 0;
     let errors = 0;
 
-    // Process in batches
-    for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
-      const batch = transactions.slice(i, i + BATCH_SIZE);
-
-      const txnList = batch.map((t) => ({
+    // Process all transactions in a single OpenAI call (client handles chunking)
+    const txnList = transactions.map((t) => {
+      const account = accountById.get(t.account_id);
+      const entry: Record<string, unknown> = {
         id: t.id,
         name: t.name,
         merchant: t.merchant_name,
         amount: t.amount,
         date: t.date,
-      }));
+      };
+      if (t.check_number) entry.check_number = t.check_number;
+      if (account) {
+        entry.account_name = account.name;
+        entry.account_type = account.type; // depository, savings, credit, investment
+      }
+      return entry;
+    });
 
-      const prompt = `You are a financial transaction categorizer. Classify each transaction into exactly one of these categories: ${categoryNames.join(", ")}.
+    const hasTransferCategory = categoryNames.some((n) => n.toLowerCase() === "transfer");
 
+    const examplesSection = fewShotExamples.length > 0
+      ? `\n\nHere is how this household has previously categorized transactions — use these as guidance:\n${JSON.stringify(fewShotExamples)}\n`
+      : "";
+
+    const transferInstructions = hasTransferCategory
+      ? `\n\nIMPORTANT — Transfer detection:
+- If a transaction looks like a payment between the user's own accounts (e.g. credit card payment, savings transfer, loan payment), classify it as "Transfer".
+- Common transfer indicators: descriptions containing "payment", "transfer", "xfer", "autopay", credit card company names (Chase, Amex, Capital One, Citi, Discover), bank names, "online banking transfer", "ACH transfer".
+- Check transactions (check_number present) that reference a bank, credit card, or financial institution are likely transfers.
+- When account_type is "depository" (checking) and the description mentions another financial institution, it's very likely a transfer.\n`
+      : "";
+
+    const prompt = `You are a financial transaction categorizer. Classify each transaction into exactly one of these categories: ${categoryNames.join(", ")}.
+${examplesSection}${transferInstructions}
 For each transaction, return a JSON object with:
 - "results": an array of objects with "id" (the transaction id), "category" (exact category name from the list), and "confidence" (0.0-1.0, how confident you are).
 
@@ -152,74 +216,77 @@ ${JSON.stringify(txnList)}
 
 Return ONLY valid JSON. Use the exact category names provided.`;
 
-      try {
-        const openaiRes = await fetch(
-          "https://api.openai.com/v1/chat/completions",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${OPENAI_API_KEY}`,
-            },
-            body: JSON.stringify({
-              model: "gpt-4o-mini",
-              temperature: 0,
-              response_format: { type: "json_object" },
-              messages: [
-                {
-                  role: "user",
-                  content: prompt,
-                },
-              ],
-            }),
-          }
+    try {
+      const openaiRes = await fetch(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            temperature: 0,
+            response_format: { type: "json_object" },
+            messages: [
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
+          }),
+        }
+      );
+
+      if (!openaiRes.ok) {
+        const errText = await openaiRes.text();
+        console.error("OpenAI error:", errText);
+        return new Response(
+          JSON.stringify({ classified: 0, skipped: 0, errors: transactions.length }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
-
-        if (!openaiRes.ok) {
-          const errText = await openaiRes.text();
-          console.error("OpenAI error:", errText);
-          errors += batch.length;
-          continue;
-        }
-
-        const openaiData = await openaiRes.json();
-        const content = openaiData.choices?.[0]?.message?.content;
-        if (!content) {
-          errors += batch.length;
-          continue;
-        }
-
-        const parsed = JSON.parse(content) as { results: ClassifyResult[] };
-        const results = parsed.results ?? [];
-
-        for (const result of results) {
-          const categoryId = categoryByName.get(result.category.toLowerCase());
-          if (!categoryId) {
-            skipped++;
-            continue;
-          }
-
-          const { error: updateError } = await adminClient
-            .from("transactions")
-            .update({
-              category_id: categoryId,
-              classified_by: "ai",
-              ai_category_confidence: Math.round(result.confidence * 100) / 100,
-            })
-            .eq("id", result.transaction_id ?? result.id)
-            .eq("household_id", household_id);
-
-          if (updateError) {
-            console.error("Update error:", updateError.message);
-            errors++;
-          } else {
-            classified++;
-          }
-        }
-      } catch (err) {
-        console.error("Batch error:", err);
-        errors += batch.length;
       }
+
+      const openaiData = await openaiRes.json();
+      const content = openaiData.choices?.[0]?.message?.content;
+      if (!content) {
+        return new Response(
+          JSON.stringify({ classified: 0, skipped: 0, errors: transactions.length }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const parsed = JSON.parse(content) as { results: ClassifyResult[] };
+      const results = parsed.results ?? [];
+
+      for (const result of results) {
+        const categoryId = categoryByName.get(result.category.toLowerCase());
+        if (!categoryId) {
+          skipped++;
+          continue;
+        }
+
+        const { error: updateError } = await adminClient
+          .from("transactions")
+          .update({
+            category_id: categoryId,
+            classified_by: "ai",
+            ai_category_confidence: Math.round(result.confidence * 100) / 100,
+          })
+          .eq("id", result.transaction_id ?? result.id)
+          .eq("household_id", household_id);
+
+        if (updateError) {
+          console.error("Update error:", updateError.message);
+          errors++;
+        } else {
+          classified++;
+        }
+      }
+    } catch (err) {
+      console.error("Classification error:", err);
+      errors += transactions.length;
     }
 
     return new Response(

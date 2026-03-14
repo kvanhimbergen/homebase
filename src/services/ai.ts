@@ -6,10 +6,16 @@ export interface ClassifyResult {
   errors: number;
 }
 
+/**
+ * Classify a batch of transactions by ID.
+ * If no IDs provided, the edge function finds uncategorized ones (legacy).
+ */
 export async function classifyTransactions(
-  householdId: string
+  householdId: string,
+  transactionIds?: string[]
 ): Promise<ClassifyResult> {
   return invokeFn<ClassifyResult>("ai-classify-transactions", {
     household_id: householdId,
+    ...(transactionIds && { transaction_ids: transactionIds }),
   });
 }

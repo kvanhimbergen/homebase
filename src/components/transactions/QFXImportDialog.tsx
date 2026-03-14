@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Upload } from "lucide-react";
 import { useCreateTransaction, useClassifyTransactions } from "@/hooks/useTransactions";
+import { autoLinkTransfers } from "@/services/transactions";
 import { useHousehold } from "@/hooks/useHousehold";
 import { toast } from "sonner";
 import { parseOFX, type OFXTransaction } from "@/lib/ofx-parser";
@@ -58,10 +59,11 @@ export function QFXImportDialog() {
     setImporting(true);
     let imported = 0;
     let skipped = 0;
+    const importedIds: string[] = [];
 
     for (const txn of transactions) {
       try {
-        await createTxn.mutateAsync({
+        const created = await createTxn.mutateAsync({
           household_id: currentHouseholdId,
           name: txn.name,
           amount: txn.amount,
@@ -71,15 +73,27 @@ export function QFXImportDialog() {
           check_number: txn.checkNum || null,
         });
         imported++;
+        importedIds.push(created.id);
       } catch {
         skipped++;
       }
     }
 
-    let classifyMsg = "";
-    if (imported > 0 && currentHousehold?.auto_classify_imports) {
+    // Auto-link transfer pairs before classification
+    let transferMsg = "";
+    if (importedIds.length > 0) {
       try {
-        const result = await classifyTxns.mutateAsync();
+        const linked = await autoLinkTransfers(currentHouseholdId, importedIds);
+        if (linked > 0) transferMsg = `, ${linked} transfer(s) linked`;
+      } catch {
+        // Non-critical
+      }
+    }
+
+    let classifyMsg = "";
+    if (importedIds.length > 0 && currentHousehold?.auto_classify_imports) {
+      try {
+        const result = await classifyTxns.mutateAsync({ transactionIds: importedIds });
         classifyMsg = `, ${result.classified} classified`;
       } catch {
         classifyMsg = ", auto-classify failed";
@@ -88,7 +102,7 @@ export function QFXImportDialog() {
 
     setImporting(false);
     toast.success(
-      `Imported ${imported} transactions${skipped > 0 ? `, ${skipped} skipped` : ""}${classifyMsg}`
+      `Imported ${imported} transactions${skipped > 0 ? `, ${skipped} skipped` : ""}${transferMsg}${classifyMsg}`
     );
     setOpen(false);
     setTransactions([]);

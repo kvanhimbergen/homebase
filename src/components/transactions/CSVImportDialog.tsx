@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/table";
 import { Upload } from "lucide-react";
 import { useCreateTransaction, useClassifyTransactions } from "@/hooks/useTransactions";
+import { autoLinkTransfers } from "@/services/transactions";
 import { useHousehold } from "@/hooks/useHousehold";
 import { toast } from "sonner";
 
@@ -96,6 +97,7 @@ export function CSVImportDialog() {
     setImporting(true);
     let imported = 0;
     let skipped = 0;
+    const importedIds: string[] = [];
 
     for (const row of rows) {
       const dateStr = row[mapping.date];
@@ -125,7 +127,7 @@ export function CSVImportDialog() {
       const importHash = `csv:${date}:${name}:${amount}`;
 
       try {
-        await createTxn.mutateAsync({
+        const txn = await createTxn.mutateAsync({
           household_id: currentHouseholdId,
           name,
           amount,
@@ -134,15 +136,28 @@ export function CSVImportDialog() {
           import_hash: importHash,
         });
         imported++;
+        importedIds.push(txn.id);
       } catch {
         skipped++;
       }
     }
 
-    let classifyMsg = "";
-    if (imported > 0 && currentHousehold?.auto_classify_imports) {
+    // Auto-link transfer pairs before classification
+    let transferMsg = "";
+    if (importedIds.length > 0) {
       try {
-        const result = await classifyTxns.mutateAsync();
+        const linked = await autoLinkTransfers(currentHouseholdId, importedIds);
+        if (linked > 0) transferMsg = `, ${linked} transfer(s) linked`;
+      } catch {
+        // Non-critical
+      }
+    }
+
+    // Filter out already-linked transfers before classifying
+    let classifyMsg = "";
+    if (importedIds.length > 0 && currentHousehold?.auto_classify_imports) {
+      try {
+        const result = await classifyTxns.mutateAsync({ transactionIds: importedIds });
         classifyMsg = `, ${result.classified} classified`;
       } catch {
         classifyMsg = ", auto-classify failed";
@@ -150,7 +165,7 @@ export function CSVImportDialog() {
     }
 
     setImporting(false);
-    toast.success(`Imported ${imported} transactions${skipped > 0 ? `, ${skipped} skipped` : ""}${classifyMsg}`);
+    toast.success(`Imported ${imported} transactions${skipped > 0 ? `, ${skipped} skipped` : ""}${transferMsg}${classifyMsg}`);
     setOpen(false);
     setRows([]);
     setHeaders([]);
