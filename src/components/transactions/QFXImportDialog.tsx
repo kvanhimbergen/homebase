@@ -16,8 +16,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Upload } from "lucide-react";
 import { useCreateTransaction, useClassifyTransactions } from "@/hooks/useTransactions";
+import { useAccounts } from "@/hooks/useAccounts";
 import { autoLinkTransfers } from "@/services/transactions";
 import { useHousehold } from "@/hooks/useHousehold";
 import { toast } from "sonner";
@@ -28,10 +37,12 @@ export function QFXImportDialog() {
   const [open, setOpen] = useState(false);
   const [transactions, setTransactions] = useState<OFXTransaction[]>([]);
   const [importing, setImporting] = useState(false);
+  const [accountId, setAccountId] = useState("");
 
   const { currentHouseholdId, currentHousehold } = useHousehold();
   const createTxn = useCreateTransaction();
   const classifyTxns = useClassifyTransactions();
+  const { data: accounts } = useAccounts();
 
   const handleFile = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -71,6 +82,7 @@ export function QFXImportDialog() {
           source: "ofx",
           import_hash: `ofx:${txn.fitId}`,
           check_number: txn.checkNum || null,
+          account_id: accountId || null,
         });
         imported++;
         importedIds.push(created.id);
@@ -182,6 +194,24 @@ export function QFXImportDialog() {
                 {transactions.length} transactions found. Showing first{" "}
                 {Math.min(5, transactions.length)} rows.
               </p>
+
+              {accounts && accounts.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Account</Label>
+                  <Select value={accountId} onValueChange={setAccountId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setOpen(false)}>

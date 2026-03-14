@@ -18,6 +18,7 @@ export const CATEGORY_COLORS = [
   "var(--color-category-17)",
   "var(--color-category-18)",
   "var(--color-category-19)",
+  "var(--color-category-20)",
 ] as const;
 
 export const TRANSACTION_SOURCES = [

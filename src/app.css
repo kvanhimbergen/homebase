@@ -67,6 +67,7 @@
   --color-category-17: oklch(0.72 0.17 15);
   --color-category-18: oklch(0.55 0.12 280);
   --color-category-19: oklch(0.66 0.2 190);
+  --color-category-20: oklch(0.60 0.10 90);
 
   /* Document category palette (12 colors) */
   --color-doc-category-1: oklch(0.60 0.16 30);

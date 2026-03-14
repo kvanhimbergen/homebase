@@ -23,14 +23,6 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -50,6 +42,7 @@ import { SplitTransactionDialog } from "./SplitTransactionDialog";
 import { ReceiptScanDialog } from "./ReceiptScanDialog";
 import { TransferMatchDialog } from "./TransferMatchDialog";
 import { TransactionDetailDrawer } from "./TransactionDetailDrawer";
+import { CategoryPicker } from "./CategoryPicker";
 import {
   useTransactions,
   useUpdateTransaction,
@@ -58,7 +51,7 @@ import {
   useLinkTransferPair,
   useUnlinkTransferPair,
 } from "@/hooks/useTransactions";
-import { useCategories, useCategoryTree } from "@/hooks/useCategories";
+import { useCategories } from "@/hooks/useCategories";
 import { useAccounts } from "@/hooks/useAccounts";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
@@ -174,7 +167,7 @@ export function Component() {
   });
 
   const { data: categories } = useCategories();
-  const categoryTree = useCategoryTree();
+
   const { data: accounts } = useAccounts();
   const updateTxn = useUpdateTransaction();
   const deleteTxns = useDeleteTransactions();
@@ -586,34 +579,13 @@ export function Component() {
           <span className="text-sm font-medium">
             {selected.size} selected
           </span>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm">
-                Set Category
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-52 p-1 max-h-72 overflow-y-auto">
-              {categoryTree.map(({ parent, children }) => (
-                <div key={parent.id}>
-                  <button
-                    className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-accent font-medium"
-                    onClick={() => handleBulkCategory(parent.id)}
-                  >
-                    {parent.name}
-                  </button>
-                  {children.map((c) => (
-                    <button
-                      key={c.id}
-                      className="w-full text-left pl-6 pr-3 py-1.5 text-sm rounded hover:bg-accent text-muted-foreground"
-                      onClick={() => handleBulkCategory(c.id)}
-                    >
-                      {c.name}
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </PopoverContent>
-          </Popover>
+          <CategoryPicker
+            value={null}
+            category={null}
+            onSelect={(id) => { if (id) handleBulkCategory(id); }}
+            triggerClassName="border rounded-md px-3 py-1.5 text-xs font-medium hover:bg-accent"
+            placeholder="Set Category"
+          />
           {selected.size === 2 && (
             <Button variant="outline" size="sm" onClick={handleMarkAsTransfer}>
               <ArrowLeftRight className="h-3 w-3 mr-1" /> Mark as Transfer
@@ -972,67 +944,25 @@ function InlineCategorySelect({
   transaction: Tables<"transactions"> & { categories: Tables<"categories"> | null };
 }) {
   const updateTxn = useUpdateTransaction();
-  const tree = useCategoryTree();
 
   return (
-    <Select
-      value={transaction.category_id ?? ""}
-      onValueChange={async (value) => {
-        const cleared = value === "__uncategorized__";
+    <CategoryPicker
+      value={transaction.category_id}
+      category={transaction.categories}
+      onSelect={async (categoryId) => {
         try {
           await updateTxn.mutateAsync({
             id: transaction.id,
             data: {
-              category_id: cleared ? null : value,
-              classified_by: cleared ? null : "user",
-              ai_category_confidence: cleared ? null : undefined,
+              category_id: categoryId,
+              classified_by: categoryId ? "user" : null,
+              ai_category_confidence: categoryId ? undefined : null,
             },
           });
         } catch {
           toast.error("Failed to update category");
         }
       }}
-    >
-      <SelectTrigger className="h-7 w-36 text-xs border-none shadow-none hover:bg-muted">
-        <SelectValue placeholder="Uncategorized">
-          {transaction.categories ? (
-            <div className="flex items-center gap-1.5">
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{
-                  backgroundColor: transaction.categories.color ?? "#94a3b8",
-                }}
-              />
-              <span className="truncate">{transaction.categories.name}</span>
-            </div>
-          ) : (
-            <span className="text-muted-foreground">Uncategorized</span>
-          )}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="__uncategorized__">
-          <span className="text-muted-foreground">Uncategorized</span>
-        </SelectItem>
-        {tree.map(({ parent, children }) => (
-          <SelectGroup key={parent.id}>
-            <SelectItem value={parent.id}>
-              <div className="flex items-center gap-1.5">
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: parent.color ?? "#94a3b8" }}
-                />
-                {parent.name}
-              </div>
-            </SelectItem>
-            {children.map((c) => (
-              <SelectItem key={c.id} value={c.id} className="pl-6">
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        ))}
-      </SelectContent>
-    </Select>
+    />
   );
 }

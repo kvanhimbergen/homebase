@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/table";
 import { Upload } from "lucide-react";
 import { useCreateTransaction, useClassifyTransactions } from "@/hooks/useTransactions";
+import { useAccounts } from "@/hooks/useAccounts";
 import { autoLinkTransfers } from "@/services/transactions";
 import { useHousehold } from "@/hooks/useHousehold";
 import { toast } from "sonner";
@@ -43,10 +44,12 @@ export function CSVImportDialog() {
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState({ date: "", name: "", amount: "" });
   const [importing, setImporting] = useState(false);
+  const [accountId, setAccountId] = useState("");
 
   const { currentHouseholdId, currentHousehold } = useHousehold();
   const createTxn = useCreateTransaction();
   const classifyTxns = useClassifyTransactions();
+  const { data: accounts } = useAccounts();
 
   const handleFile = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,6 +137,7 @@ export function CSVImportDialog() {
           date,
           source: "csv",
           import_hash: importHash,
+          account_id: accountId || null,
         });
         imported++;
         importedIds.push(txn.id);
@@ -204,6 +208,24 @@ export function CSVImportDialog() {
 
           {headers.length > 0 && (
             <>
+              {accounts && accounts.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Account</Label>
+                  <Select value={accountId} onValueChange={setAccountId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Date column</Label>

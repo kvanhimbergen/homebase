@@ -85,6 +85,7 @@ export async function seedDefaultCategories(householdId: string) {
     { name: "Gifts & Donations", icon: "gift", color: "var(--color-category-17)" },
     { name: "Taxes & Fees", icon: "receipt", color: "var(--color-category-18)" },
     { name: "Subscriptions", icon: "repeat", color: "var(--color-category-19)" },
+    { name: "Cash & ATM", icon: "banknote", color: "var(--color-category-20)" },
   ];
 
   const { data: inserted, error: parentError } = await supabase
@@ -122,6 +123,7 @@ export async function seedDefaultCategories(householdId: string) {
     "Gifts & Donations": ["Charitable Giving", "Gifts Given", "Tithing"],
     "Taxes & Fees": ["Federal Tax", "State Tax", "Bank Fees", "ATM Fees", "Late Fees"],
     "Subscriptions": ["Software", "Memberships", "Newspapers/Magazines"],
+    "Cash & ATM": ["ATM Withdrawal", "Cash Purchase"],
   };
 
   const subcategoryRows = Object.entries(subcategoryMap).flatMap(
@@ -236,6 +238,7 @@ const PARENT_DEFINITIONS = [
   { name: "Gifts & Donations", icon: "gift", color: "var(--color-category-17)" },
   { name: "Taxes & Fees", icon: "receipt", color: "var(--color-category-18)" },
   { name: "Subscriptions", icon: "repeat", color: "var(--color-category-19)" },
+  { name: "Cash & ATM", icon: "banknote", color: "var(--color-category-20)" },
 ];
 
 const SUBCATEGORY_MAP: Record<string, string[]> = {
@@ -257,6 +260,7 @@ const SUBCATEGORY_MAP: Record<string, string[]> = {
   "Gifts & Donations": ["Charitable Giving", "Gifts Given", "Tithing"],
   "Taxes & Fees": ["Federal Tax", "State Tax", "Bank Fees", "ATM Fees", "Late Fees"],
   "Subscriptions": ["Software", "Memberships", "Newspapers/Magazines"],
+  "Cash & ATM": ["ATM Withdrawal", "Cash Purchase"],
 };
 
 export async function backfillSubcategories(householdId: string) {
