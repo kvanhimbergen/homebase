@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
-import { Plus, Trash2, PiggyBank } from "lucide-react";
+import { Plus, Trash2, PiggyBank, Pencil, Check, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useBudgets, useCreateBudget, useDeleteBudget } from "@/hooks/useBudgets";
+import { useBudgets, useCreateBudget, useUpdateBudget, useDeleteBudget } from "@/hooks/useBudgets";
 import { useCategories } from "@/hooks/useCategories";
 import { useSpendingByCategory } from "@/hooks/useTransactions";
 import { useHousehold } from "@/hooks/useHousehold";
@@ -44,7 +44,10 @@ export function Component() {
 
   const { data: budgets, isLoading } = useBudgets();
   const { data: spending } = useSpendingByCategory(start, end);
+  const updateBudget = useUpdateBudget();
   const deleteBudget = useDeleteBudget();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState("");
 
   const budgetRows = (budgets ?? []).map((budget) => {
     const spent = Math.abs(
@@ -142,24 +145,91 @@ export function Component() {
                         )}
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-sm tabular-nums text-muted-foreground">
-                          {formatCurrency(row.spent)} / {formatCurrency(row.amount)}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={async () => {
-                            try {
-                              await deleteBudget.mutateAsync(row.id);
-                              toast.success("Budget deleted");
-                            } catch (err) {
-                              toast.error(`Failed to delete budget: ${err instanceof Error ? err.message : err}`);
-                            }
-                          }}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        {editingId === row.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={editAmount}
+                              onChange={(e) => setEditAmount(e.target.value)}
+                              className="w-24 h-7 text-sm"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") setEditingId(null);
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  const val = parseFloat(editAmount);
+                                  if (!isNaN(val) && val > 0) {
+                                    updateBudget.mutateAsync({ id: row.id, data: { amount: val } })
+                                      .then(() => { toast.success("Budget updated"); setEditingId(null); })
+                                      .catch(() => toast.error("Failed to update budget"));
+                                  }
+                                }
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={async () => {
+                                const val = parseFloat(editAmount);
+                                if (!isNaN(val) && val > 0) {
+                                  try {
+                                    await updateBudget.mutateAsync({ id: row.id, data: { amount: val } });
+                                    toast.success("Budget updated");
+                                    setEditingId(null);
+                                  } catch {
+                                    toast.error("Failed to update budget");
+                                  }
+                                }
+                              }}
+                            >
+                              <Check className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => setEditingId(null)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="text-sm tabular-nums text-muted-foreground">
+                              {formatCurrency(row.spent)} / {formatCurrency(row.amount)}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              title="Edit budget"
+                              onClick={() => {
+                                setEditingId(row.id);
+                                setEditAmount(String(row.amount));
+                              }}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={async () => {
+                                try {
+                                  await deleteBudget.mutateAsync(row.id);
+                                  toast.success("Budget deleted");
+                                } catch (err) {
+                                  toast.error(`Failed to delete budget: ${err instanceof Error ? err.message : err}`);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                     <Progress

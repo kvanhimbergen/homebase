@@ -14,6 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -53,6 +54,7 @@ export function Component() {
   const [previewDoc, setPreviewDoc] = useState<DocumentWithCategory | null>(
     null
   );
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const seededRef = useRef(false);
 
   const { currentHouseholdId } = useHousehold();
@@ -103,9 +105,33 @@ export function Component() {
       await deleteDoc.mutateAsync(id);
       toast.success("Document deleted");
       if (previewDoc?.id === id) setPreviewDoc(null);
+      setSelected((prev) => { const next = new Set(prev); next.delete(id); return next; });
     } catch {
       toast.error("Failed to delete document");
     }
+  }
+
+  async function handleBulkDelete() {
+    const ids = Array.from(selected);
+    let deleted = 0;
+    for (const id of ids) {
+      try {
+        await deleteDoc.mutateAsync(id);
+        deleted++;
+      } catch { /* continue */ }
+    }
+    toast.success(`Deleted ${deleted} document(s)`);
+    setSelected(new Set());
+    if (previewDoc && ids.includes(previewDoc.id)) setPreviewDoc(null);
+  }
+
+  function toggleDocSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   async function handleDownload(doc: DocumentWithCategory) {
@@ -260,6 +286,18 @@ export function Component() {
           {/* Content header */}
           <div className="flex items-center gap-3 mb-4">
             <h2 className="text-lg font-semibold">{getViewTitle()}</h2>
+            {selected.size > 0 && (
+              <div className="flex items-center gap-2 ml-2">
+                <span className="text-sm text-muted-foreground">{selected.size} selected</span>
+                <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                  Delete
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+                  Clear
+                </Button>
+              </div>
+            )}
             <div className="relative flex-1 max-w-sm ml-auto">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -327,10 +365,21 @@ export function Component() {
                   >
                     <CardContent className="pt-5 pb-4">
                       <div className="flex items-start justify-between mb-3">
-                        <DocCardIcon
-                          iconName={doc.document_categories?.icon ?? null}
-                          color={doc.document_categories?.color ?? null}
-                        />
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Checkbox
+                              checked={selected.has(doc.id)}
+                              onCheckedChange={() => toggleDocSelect(doc.id)}
+                            />
+                          </div>
+                          <DocCardIcon
+                            iconName={doc.document_categories?.icon ?? null}
+                            color={doc.document_categories?.color ?? null}
+                          />
+                        </div>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button
                             variant="ghost"

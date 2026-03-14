@@ -165,7 +165,7 @@ export function Component() {
     sortBy,
     sortDirection,
     sources: sourceFilter.length > 0 ? sourceFilter as TransactionSource[] : undefined,
-    classifiedByList: classifiedByFilter.length > 0 ? classifiedByFilter as ("user" | "ai" | "plaid" | "none")[] : undefined,
+    classifiedByList: classifiedByFilter.length > 0 ? classifiedByFilter as ("user" | "ai" | "none")[] : undefined,
     minAmount: parsedMin != null && !isNaN(parsedMin) ? parsedMin : undefined,
     maxAmount: parsedMax != null && !isNaN(parsedMax) ? parsedMax : undefined,
     hasCheckNumber: checksOnly || undefined,
@@ -472,7 +472,7 @@ export function Component() {
                     {classifiedByFilter.length === 0
                       ? "All statuses"
                       : classifiedByFilter.length === 1
-                        ? { ai: "AI classified", user: "User classified", plaid: "Plaid classified", none: "Uncategorized" }[classifiedByFilter[0]]
+                        ? { ai: "AI classified", user: "User classified", none: "Uncategorized" }[classifiedByFilter[0]]
                         : `${classifiedByFilter.length} statuses`}
                     <ChevronDown className="h-3.5 w-3.5 opacity-50" />
                   </Button>
@@ -482,7 +482,6 @@ export function Component() {
                     {([
                       { value: "ai", label: "AI classified" },
                       { value: "user", label: "User classified" },
-                      { value: "plaid", label: "Plaid classified" },
                       { value: "none", label: "Uncategorized" },
                     ] as const).map(({ value, label }) => (
                       <label
@@ -692,6 +691,9 @@ export function Component() {
                   <TableCell colSpan={7} className="text-center py-12">
                     <p className="text-sm text-muted-foreground">
                       No transactions found.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Use "Import CSV" or "Import QFX" above to get started, or add one manually.
                     </p>
                   </TableCell>
                 </TableRow>

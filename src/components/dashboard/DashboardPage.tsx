@@ -300,7 +300,7 @@ export function Component() {
                   No transactions yet.
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Add transactions manually or connect a bank account.
+                  Import a CSV or QFX file, or add transactions manually.
                 </p>
               </div>
             )}

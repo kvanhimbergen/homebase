@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SpendingDonut, SpendingLegend } from "@/components/charts/SpendingDonut";
 import { CashFlowBar } from "@/components/charts/CashFlowBar";
 import { CategoryTrends, type TrendData } from "@/components/charts/CategoryTrends";
+import { IncomeFlowChart } from "@/components/charts/IncomeFlowChart";
 import { useSpendingByCategory, useCashFlow } from "@/hooks/useTransactions";
 import { useHousehold } from "@/hooks/useHousehold";
 import { formatCurrency } from "@/lib/formatters";
@@ -178,7 +179,6 @@ export function Component() {
           <TabsTrigger value="spending">Spending</TabsTrigger>
           <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
           <TabsTrigger value="trends">Trends</TabsTrigger>
-          <TabsTrigger value="income">Income</TabsTrigger>
         </TabsList>
 
         <TabsContent value="spending" className="mt-4">
@@ -270,14 +270,38 @@ export function Component() {
         </TabsContent>
 
         <TabsContent value="cashflow" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Cash Flow Over Time</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CashFlowBarFetcher months={monthlyQueries} onBarClick={handleCashFlowBarClick} />
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  Cash Flow — {format(new Date(), "MMMM yyyy")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {spendingLoading || cashFlowLoading ? (
+                  <Skeleton className="h-[400px] w-full" />
+                ) : spending && spending.length > 0 && cashFlow ? (
+                  <IncomeFlowChart
+                    income={cashFlow.income}
+                    spending={spending}
+                    onCategoryClick={(id) =>
+                      navigate(`/transactions?categoryId=${id}`)
+                    }
+                  />
+                ) : (
+                  <EmptyState />
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Cash Flow Over Time</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CashFlowBarFetcher months={monthlyQueries} onBarClick={handleCashFlowBarClick} />
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="trends" className="mt-4">
@@ -291,26 +315,6 @@ export function Component() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="income" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Income Breakdown</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {cashFlowLoading ? (
-                <Skeleton className="h-[300px] w-full" />
-              ) : (
-                <div className="text-center py-12">
-                  <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-                  <p className="text-sm text-muted-foreground">
-                    Income breakdown will appear once you have income
-                    transactions categorized.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   );

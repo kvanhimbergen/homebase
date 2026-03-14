@@ -21,11 +21,9 @@ export const CATEGORY_COLORS = [
 ] as const;
 
 export const TRANSACTION_SOURCES = [
-  "plaid",
   "manual",
   "csv",
   "ofx",
-  "email",
   "receipt",
 ] as const;
 

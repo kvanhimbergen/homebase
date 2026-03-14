@@ -377,8 +377,9 @@ function AddCategoryDialog() {
 
 function HouseholdMembers() {
   const { currentHouseholdId } = useHousehold();
+  const { user } = useAuth();
   const [members, setMembers] = useState<
-    { id: string; user_id: string; role: string; email?: string }[]
+    { id: string; user_id: string; role: string; display_name: string | null }[]
   >([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -387,11 +388,20 @@ function HouseholdMembers() {
       .from("household_members")
       .select("id, user_id, role")
       .eq("household_id", currentHouseholdId)
-      .then(({ data }) => {
+      .then(async ({ data }) => {
+        if (!data) { setLoaded(true); return; }
+        const userIds = data.map((m) => m.user_id);
+        const { data: profiles } = await supabase
+          .from("user_profiles")
+          .select("id, display_name")
+          .in("id", userIds);
+        const profileMap = new Map(
+          (profiles ?? []).map((p) => [p.id, p.display_name])
+        );
         setMembers(
-          (data ?? []).map((m) => ({
+          data.map((m) => ({
             ...m,
-            email: undefined,
+            display_name: profileMap.get(m.user_id) ?? null,
           }))
         );
         setLoaded(true);
@@ -400,29 +410,35 @@ function HouseholdMembers() {
 
   return (
     <div className="space-y-2">
-      {members.map((m) => (
-        <div
-          key={m.id}
-          className="flex items-center justify-between py-2"
-        >
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-              <Users className="h-4 w-4 text-muted-foreground" />
+      {members.map((m) => {
+        const displayName = m.display_name ?? (m.user_id === user?.id ? user.email : m.user_id.slice(0, 8) + "...");
+        return (
+          <div
+            key={m.id}
+            className="flex items-center justify-between py-2"
+          >
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
+                {(typeof displayName === "string" ? displayName : "?").charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <p className="text-sm font-medium">
+                  {displayName}
+                  {m.user_id === user?.id && (
+                    <span className="text-xs text-muted-foreground ml-1">(you)</span>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground capitalize">
+                  {m.role}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium">
-                {m.user_id.slice(0, 8)}...
-              </p>
-              <p className="text-xs text-muted-foreground capitalize">
-                {m.role}
-              </p>
-            </div>
+            <Badge variant="secondary" className="text-xs capitalize">
+              {m.role}
+            </Badge>
           </div>
-          <Badge variant="secondary" className="text-xs capitalize">
-            {m.role}
-          </Badge>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

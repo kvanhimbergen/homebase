@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import {
   Landmark,
   CreditCard,
@@ -7,10 +7,8 @@ import {
   Plus,
   Eye,
   EyeOff,
-  RefreshCw,
-  Loader2,
+  Pencil,
 } from "lucide-react";
-import { usePlaidLink } from "react-plaid-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,13 +37,6 @@ import {
   useCreditCardPayments,
 } from "@/hooks/useAccounts";
 import { useHousehold } from "@/hooks/useHousehold";
-import {
-  usePlaidItems,
-  useCreateLinkToken,
-  useExchangePublicToken,
-  useSyncTransactions,
-} from "@/hooks/usePlaid";
-import { useClassifyTransactions } from "@/hooks/useTransactions";
 import { formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -63,10 +54,7 @@ const ACCOUNT_TYPE_META: Record<
 export function Component() {
   const { data: accounts, isLoading } = useAccounts();
   const { data: summary, isLoading: summaryLoading } = useAccountBalanceSummary();
-  const { currentRole } = useHousehold();
   const updateAccount = useUpdateAccount();
-  const canManagePlaid = currentRole === "owner" || currentRole === "admin";
-
   const { data: ccPayments } = useCreditCardPayments();
   const visibleAccounts = accounts?.filter((a) => !a.is_hidden) ?? [];
   const hiddenAccounts = accounts?.filter((a) => a.is_hidden) ?? [];
@@ -88,8 +76,6 @@ export function Component() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Accounts</h1>
         <div className="flex items-center gap-2">
-          {canManagePlaid && <SyncAllButton />}
-          {canManagePlaid && <PlaidConnectButton />}
           <AddManualAccountDialog />
         </div>
       </div>
@@ -156,10 +142,10 @@ export function Component() {
             <div className="text-center py-12">
               <Landmark className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
               <p className="text-sm text-muted-foreground">
-                No accounts connected yet.
+                No accounts yet.
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Connect a bank or add a manual account to get started.
+                Click "Add Account" to start tracking your balances.
               </p>
             </div>
           ) : (
@@ -198,11 +184,6 @@ export function Component() {
                             ****{account.mask}
                           </span>
                         )}
-                        {account.plaid_account_id && (
-                          <Badge variant="outline" className="text-[10px] h-4">
-                            Plaid
-                          </Badge>
-                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -216,6 +197,7 @@ export function Component() {
                       >
                         {formatCurrency(account.balance_current ?? 0)}
                       </span>
+                      <EditAccountDialog account={account} />
                       <Button
                         variant="ghost"
                         size="icon"
@@ -363,174 +345,89 @@ function BalanceCard({
   );
 }
 
-function PlaidConnectButton() {
-  const { currentHouseholdId } = useHousehold();
-  const createLinkToken = useCreateLinkToken();
-  const exchangeToken = useExchangePublicToken();
-  const syncTransactions = useSyncTransactions();
-  const classifyTxns = useClassifyTransactions();
-  const [linkToken, setLinkToken] = useState<string | null>(null);
+function EditAccountDialog({ account }: { account: { id: string; name: string; type: string; balance_current: number | null } }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(account.name);
+  const [type, setType] = useState(account.type);
+  const [balance, setBalance] = useState(String(account.balance_current ?? 0));
+  const updateAccount = useUpdateAccount();
 
-  async function handleClick() {
-    if (!currentHouseholdId) return;
+  function handleOpen(isOpen: boolean) {
+    setOpen(isOpen);
+    if (isOpen) {
+      setName(account.name);
+      setType(account.type);
+      setBalance(String(account.balance_current ?? 0));
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name) return;
     try {
-      const { link_token } = await createLinkToken.mutateAsync(currentHouseholdId);
-      setLinkToken(link_token);
+      await updateAccount.mutateAsync({
+        id: account.id,
+        data: { name, type, balance_current: balance ? parseFloat(balance) : 0 },
+      });
+      toast.success("Account updated");
+      setOpen(false);
     } catch (err) {
-      toast.error(`Failed to start bank connection: ${err instanceof Error ? err.message : err}`);
+      toast.error(`Failed to update account: ${err instanceof Error ? err.message : err}`);
     }
   }
 
   return (
-    <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleClick}
-        disabled={createLinkToken.isPending}
-      >
-        {createLinkToken.isPending ? (
-          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-        ) : (
-          <Plus className="h-4 w-4 mr-1" />
-        )}
-        Connect Bank
-      </Button>
-      {linkToken && (
-        <PlaidLinkWidget
-          linkToken={linkToken}
-          onDone={() => setLinkToken(null)}
-          exchangeToken={exchangeToken}
-          syncTransactions={syncTransactions}
-          classifyTransactions={classifyTxns}
-        />
-      )}
-    </>
-  );
-}
-
-function PlaidLinkWidget({
-  linkToken,
-  onDone,
-  exchangeToken,
-  syncTransactions,
-  classifyTransactions,
-}: {
-  linkToken: string;
-  onDone: () => void;
-  exchangeToken: ReturnType<typeof useExchangePublicToken>;
-  syncTransactions: ReturnType<typeof useSyncTransactions>;
-  classifyTransactions: ReturnType<typeof useClassifyTransactions>;
-}) {
-  const { currentHouseholdId } = useHousehold();
-
-  const onSuccess = useCallback(
-    async (publicToken: string, metadata: { institution: { name: string; institution_id: string } | null }) => {
-      if (!currentHouseholdId) return;
-      try {
-        toast.info("Connecting your bank...");
-        const result = await exchangeToken.mutateAsync({
-          publicToken,
-          householdId: currentHouseholdId,
-          institution: metadata.institution ?? { name: "Unknown", institution_id: "" },
-        });
-        toast.success(`Connected! ${result.accounts_created} account(s) linked.`);
-
-        toast.info("Syncing transactions...");
-        const sync = await syncTransactions.mutateAsync(result.plaid_item_id);
-        toast.success(`Synced ${sync.added} transaction(s).`);
-
-        // Auto-classify uncategorized transactions
-        try {
-          const ai = await classifyTransactions.mutateAsync();
-          if (ai.classified > 0) {
-            toast.success(`AI classified ${ai.classified} transaction(s).`);
-          }
-        } catch {
-          // Non-critical — don't block the flow
-        }
-      } catch (err) {
-        toast.error(`Connection failed: ${err instanceof Error ? err.message : err}`);
-      } finally {
-        onDone();
-      }
-    },
-    [currentHouseholdId, exchangeToken, syncTransactions, classifyTransactions, onDone]
-  );
-
-  const onExit = useCallback(() => {
-    onDone();
-  }, [onDone]);
-
-  const { open, ready } = usePlaidLink({
-    token: linkToken,
-    onSuccess,
-    onExit,
-  });
-
-  useEffect(() => {
-    if (ready) open();
-  }, [ready, open]);
-
-  return null;
-}
-
-function SyncAllButton() {
-  const { data: plaidItems } = usePlaidItems();
-  const syncTransactions = useSyncTransactions();
-  const classifyTxns = useClassifyTransactions();
-  const [syncing, setSyncing] = useState(false);
-
-  async function handleSync() {
-    if (!plaidItems?.length) {
-      toast.info("No connected banks to sync.");
-      return;
-    }
-    setSyncing(true);
-    let totalAdded = 0;
-    let totalModified = 0;
-    let errors = 0;
-
-    for (const item of plaidItems) {
-      try {
-        const result = await syncTransactions.mutateAsync(item.id);
-        totalAdded += result.added;
-        totalModified += result.modified;
-      } catch {
-        errors++;
-      }
-    }
-
-    // Auto-classify uncategorized transactions after sync
-    try {
-      const ai = await classifyTxns.mutateAsync();
-      if (ai.classified > 0) {
-        toast.success(`AI classified ${ai.classified} transaction(s).`);
-      }
-    } catch {
-      // Non-critical
-    }
-
-    setSyncing(false);
-
-    if (errors > 0) {
-      toast.warning(`Synced with ${errors} error(s). ${totalAdded} added, ${totalModified} modified.`);
-    } else {
-      toast.success(`Sync complete: ${totalAdded} added, ${totalModified} modified.`);
-    }
-  }
-
-  if (!plaidItems?.length) return null;
-
-  return (
-    <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
-      {syncing ? (
-        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-      ) : (
-        <RefreshCw className="h-4 w-4 mr-1" />
-      )}
-      Sync All
-    </Button>
+    <Dialog open={open} onOpenChange={handleOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit account">
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit Account</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Account Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} required />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="depository">Checking</SelectItem>
+                  <SelectItem value="savings">Savings</SelectItem>
+                  <SelectItem value="credit">Credit Card</SelectItem>
+                  <SelectItem value="investment">Investment</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Current Balance</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={balance}
+                onChange={(e) => setBalance(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={updateAccount.isPending}>
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

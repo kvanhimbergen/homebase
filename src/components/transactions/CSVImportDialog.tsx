@@ -165,7 +165,7 @@ export function CSVImportDialog() {
           Import CSV
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Import from CSV</DialogTitle>
         </DialogHeader>
