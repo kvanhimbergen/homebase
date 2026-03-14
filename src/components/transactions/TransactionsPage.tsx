@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ArrowLeftRight,
   Unlink,
+  CheckCircle,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -100,6 +101,7 @@ export function Component() {
   const [detailTxn, setDetailTxn] = useState<(Tables<"transactions"> & { categories: Tables<"categories"> | null; accounts: Tables<"accounts"> | null }) | null>(null);
   const [checksOnly, setChecksOnly] = useState(false);
   const [lowConfidenceOnly, setLowConfidenceOnly] = useState(false);
+  const [needsReviewOnly, setNeedsReviewOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(
     !!searchParams.get("categoryId") || !!initialAmountType
   );
@@ -164,6 +166,7 @@ export function Component() {
     maxAmount: parsedMax != null && !isNaN(parsedMax) ? parsedMax : undefined,
     hasCheckNumber: checksOnly || undefined,
     maxAiConfidence: lowConfidenceOnly ? 0.7 : undefined,
+    needsReview: needsReviewOnly || undefined,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
   });
@@ -234,6 +237,31 @@ export function Component() {
       }
     } catch {
       toast.error("Failed to classify transactions", { id: toastId });
+    }
+  }
+
+  async function handleMarkReviewed() {
+    const ids = Array.from(selected);
+    const unreviewed = transactions.filter(
+      (t) => ids.includes(t.id) && !t.reviewed
+    );
+    if (unreviewed.length === 0) {
+      toast.info("All selected transactions are already reviewed");
+      return;
+    }
+    try {
+      await Promise.all(
+        unreviewed.map((t) =>
+          updateTxn.mutateAsync({
+            id: t.id,
+            data: { reviewed: true },
+          })
+        )
+      );
+      toast.success(`Marked ${unreviewed.length} as reviewed`);
+      setSelected(new Set());
+    } catch {
+      toast.error("Failed to mark as reviewed");
     }
   }
 
@@ -559,6 +587,13 @@ export function Component() {
                 />
                 Low confidence
               </label>
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <Checkbox
+                  checked={needsReviewOnly}
+                  onCheckedChange={(checked) => setNeedsReviewOnly(!!checked)}
+                />
+                Needs review
+              </label>
               <Button
                 variant="ghost"
                 size="sm"
@@ -571,6 +606,7 @@ export function Component() {
                   setMaxAmount("");
                   setChecksOnly(false);
                   setLowConfidenceOnly(false);
+                  setNeedsReviewOnly(false);
                   setStartDate(format(subMonths(new Date(), 3), "yyyy-MM-dd"));
                   setEndDate(format(new Date(), "yyyy-MM-dd"));
                   setSortBy("date");
@@ -601,6 +637,9 @@ export function Component() {
               <ArrowLeftRight className="h-3 w-3 mr-1" /> Mark as Transfer
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={handleMarkReviewed}>
+            <CheckCircle className="h-3 w-3 mr-1" /> Mark Reviewed
+          </Button>
           <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
             <Trash2 className="h-3 w-3 mr-1" /> Delete
           </Button>
@@ -739,6 +778,9 @@ export function Component() {
                           <Badge variant="outline" className="text-[10px] h-4">
                             {txn.source}
                           </Badge>
+                        )}
+                        {txn.reviewed && (
+                          <span title="Reviewed"><CheckCircle className="h-3 w-3 text-green-500 shrink-0" /></span>
                         )}
                       </div>
                     </TableCell>

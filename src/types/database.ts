@@ -301,6 +301,7 @@ export interface Database {
           transfer_pair_id: string | null;
           is_transfer: boolean;
           check_number: string | null;
+          reviewed: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -324,6 +325,7 @@ export interface Database {
           transfer_pair_id?: string | null;
           is_transfer?: boolean;
           check_number?: string | null;
+          reviewed?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -347,6 +349,7 @@ export interface Database {
           transfer_pair_id?: string | null;
           is_transfer?: boolean;
           check_number?: string | null;
+          reviewed?: boolean;
           created_at?: string;
           updated_at?: string;
         };

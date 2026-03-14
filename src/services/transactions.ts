@@ -21,6 +21,7 @@ export interface TransactionFilters {
   maxAmount?: number;
   hasCheckNumber?: boolean;
   maxAiConfidence?: number;
+  needsReview?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -79,6 +80,9 @@ export async function getTransactions(filters: TransactionFilters) {
     query = query
       .eq("classified_by", "ai")
       .lte("ai_category_confidence", filters.maxAiConfidence);
+  }
+  if (filters.needsReview) {
+    query = query.eq("reviewed", false);
   }
   if (filters.minAmount != null) {
     query = query.gte("amount", filters.minAmount);

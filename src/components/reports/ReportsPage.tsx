@@ -33,17 +33,13 @@ export function Component() {
     format(endOfMonth(new Date()), "yyyy-MM-dd")
   );
 
-  // Current month for spending donut
-  const currentStart = format(startOfMonth(new Date()), "yyyy-MM-dd");
-  const currentEnd = format(endOfMonth(new Date()), "yyyy-MM-dd");
-
   const { data: spending, isLoading: spendingLoading } = useSpendingByCategory(
-    currentStart,
-    currentEnd
+    startDate,
+    endDate
   );
   const { data: cashFlow, isLoading: cashFlowLoading } = useCashFlow(
-    currentStart,
-    currentEnd
+    startDate,
+    endDate
   );
 
   const totalSpent =
@@ -55,7 +51,7 @@ export function Component() {
   const [hoveredCategoryId, setHoveredCategoryId] = useState<string | null>(null);
 
   // Reset drill-down when date range changes
-  const dateKey = `${currentStart}-${currentEnd}`;
+  const dateKey = `${startDate}-${endDate}`;
   const [prevDateKey, setPrevDateKey] = useState(dateKey);
   if (dateKey !== prevDateKey) {
     setPrevDateKey(dateKey);
@@ -186,7 +182,7 @@ export function Component() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
-                  Spending by Category — {format(new Date(), "MMMM yyyy")}
+                  Spending by Category — {format(new Date(startDate), "MMM d, yyyy")} – {format(new Date(endDate), "MMM d, yyyy")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -274,7 +270,7 @@ export function Component() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
-                  Cash Flow — {format(new Date(), "MMMM yyyy")}
+                  Cash Flow — {format(new Date(startDate), "MMM d, yyyy")} – {format(new Date(endDate), "MMM d, yyyy")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
