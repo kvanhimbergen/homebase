@@ -36,6 +36,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { CATEGORY_COLORS } from "@/lib/constants";
+import { CategoryIcon } from "@/lib/icons";
 
 export function Component() {
   const { user, signOut } = useAuth();
@@ -171,7 +172,6 @@ function CategoriesSettings() {
 
   const customCategories = categories?.filter((c) => !c.is_system) ?? [];
   const systemTree = categoryTree.filter((n) => n.parent.is_system);
-  const hasSubcategories = categories?.some((c) => c.parent_id) ?? false;
 
   async function handleBackfill() {
     if (!currentHouseholdId) return;
@@ -242,25 +242,24 @@ function CategoriesSettings() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">System Categories</CardTitle>
-          {!hasSubcategories && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleBackfill}
-              disabled={backfilling}
-            >
-              {backfilling ? "Adding..." : "Add Subcategories"}
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleBackfill}
+            disabled={backfilling}
+          >
+            {backfilling ? "Adding..." : "Sync Subcategories"}
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="space-y-1">
             {systemTree.map(({ parent, children }) => (
               <div key={parent.id}>
                 <div className="flex items-center gap-3 py-2">
-                  <div
-                    className="w-4 h-4 rounded-full"
-                    style={{ backgroundColor: parent.color ?? "#94a3b8" }}
+                  <CategoryIcon
+                    iconName={parent.icon}
+                    className="h-4 w-4 shrink-0"
+                    style={{ color: parent.color ?? "#94a3b8" }}
                   />
                   <span className="text-sm font-medium">{parent.name}</span>
                   <Badge variant="secondary" className="text-[10px] ml-auto">
@@ -270,12 +269,8 @@ function CategoriesSettings() {
                 {children.filter((c) => c.is_system).map((child) => (
                   <div
                     key={child.id}
-                    className="flex items-center gap-3 py-1.5 pl-7"
+                    className="flex items-center gap-3 py-1.5 pl-8"
                   >
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: child.color ?? "#94a3b8" }}
-                    />
                     <span className="text-sm text-muted-foreground">
                       {child.name}
                     </span>

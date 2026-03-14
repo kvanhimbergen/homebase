@@ -17,6 +17,7 @@ import {
   Camera,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
+import { CategoryIcon } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/types/database";
 
@@ -80,12 +81,10 @@ export function TransactionDetailDrawer({
           <DetailRow label="Category">
             {transaction.categories ? (
               <div className="flex items-center gap-2">
-                <div
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{
-                    backgroundColor:
-                      transaction.categories.color ?? "#94a3b8",
-                  }}
+                <CategoryIcon
+                  iconName={transaction.categories.icon}
+                  className="h-4 w-4 shrink-0"
+                  style={{ color: transaction.categories.color ?? "#94a3b8" }}
                 />
                 <span>{transaction.categories.name}</span>
               </div>

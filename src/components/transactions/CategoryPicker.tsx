@@ -4,13 +4,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronRight, Plus, Search, X } from "lucide-react";
+import { ChevronRight, Plus, Search, Check, X } from "lucide-react";
 import { useCategoryTree, useCreateCategory } from "@/hooks/useCategories";
 import { useHousehold } from "@/hooks/useHousehold";
+import { CategoryIcon } from "@/lib/icons";
 import { cn } from "@/lib/utils";
-import { CATEGORY_COLORS } from "@/lib/constants";
 import { toast } from "sonner";
 import type { Tables } from "@/types/database";
 
@@ -34,8 +33,9 @@ export function CategoryPicker({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState("");
+  // Track which parent we're adding a subcategory to
+  const [addingTo, setAddingTo] = useState<string | null>(null);
+  const [newSubName, setNewSubName] = useState("");
 
   const tree = useCategoryTree();
   const createCategory = useCreateCategory();
@@ -73,33 +73,47 @@ export function CategoryPicker({
       .filter((n): n is FilteredNode => n !== null);
   }, [tree, search]);
 
+  // Resolve icon for a category — falls back to parent icon for subcategories
+  const resolveIcon = useCallback((cat: Tables<"categories"> | null) => {
+    if (!cat) return null;
+    if (cat.icon) return cat.icon;
+    // Find parent icon
+    if (cat.parent_id) {
+      const parentNode = tree.find((n) => n.parent.id === cat.parent_id);
+      return parentNode?.parent.icon ?? null;
+    }
+    return null;
+  }, [tree]);
+
   function handleSelect(id: string | null) {
     onSelect(id);
     setOpen(false);
     setSearch("");
+    setAddingTo(null);
+    setNewSubName("");
   }
 
-  async function handleCreate() {
-    if (!newName.trim() || !currentHouseholdId) return;
+  async function handleCreateSub(parentId: string, parentColor: string | null) {
+    if (!newSubName.trim() || !currentHouseholdId) return;
     try {
-      const colorIdx = tree.length % CATEGORY_COLORS.length;
       const created = await createCategory.mutateAsync({
         household_id: currentHouseholdId,
-        name: newName.trim(),
-        color: CATEGORY_COLORS[colorIdx],
+        name: newSubName.trim(),
+        parent_id: parentId,
+        color: parentColor,
         is_system: false,
       });
-      toast.success(`Created "${newName.trim()}"`);
-      setNewName("");
-      setCreating(false);
+      toast.success(`Created "${newSubName.trim()}"`);
+      setNewSubName("");
+      setAddingTo(null);
       handleSelect(created.id);
     } catch {
-      toast.error("Failed to create category");
+      toast.error("Failed to create subcategory");
     }
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setAddingTo(null); setNewSubName(""); } }}>
       <PopoverTrigger asChild>
         <button
           className={cn(
@@ -109,9 +123,10 @@ export function CategoryPicker({
         >
           {category ? (
             <>
-              <div
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ backgroundColor: category.color ?? "#94a3b8" }}
+              <CategoryIcon
+                iconName={resolveIcon(category)}
+                className="h-3.5 w-3.5 shrink-0"
+                style={{ color: category.color ?? "#94a3b8" }}
               />
               <span className="truncate">{category.name}</span>
             </>
@@ -120,7 +135,7 @@ export function CategoryPicker({
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-60 p-0" align={align}>
+      <PopoverContent className="w-64 p-0" align={align}>
         {/* Search */}
         <div className="p-2 border-b">
           <div className="relative">
@@ -136,7 +151,7 @@ export function CategoryPicker({
         </div>
 
         {/* Category list */}
-        <div className="max-h-64 overflow-y-auto p-1">
+        <div className="max-h-72 overflow-y-auto p-1">
           {/* Uncategorized option */}
           <button
             className={cn(
@@ -145,17 +160,21 @@ export function CategoryPicker({
             )}
             onClick={() => handleSelect(null)}
           >
-            <div className="w-2 h-2 rounded-full bg-slate-300" />
+            <div className="w-3.5 h-3.5 flex items-center justify-center">
+              <div className="w-2 h-2 rounded-full bg-slate-300" />
+            </div>
             <span className="text-muted-foreground">Uncategorized</span>
           </button>
 
           {filteredTree.map(({ parent, children, forceOpen }) => {
             const isExpanded = forceOpen || expanded.has(parent.id) || search.trim().length > 0;
             const hasChildren = children.length > 0;
+            const isAddingHere = addingTo === parent.id;
 
             return (
               <div key={parent.id}>
-                <div className="flex items-center">
+                {/* Parent row */}
+                <div className="flex items-center group/parent">
                   {hasChildren ? (
                     <button
                       className="p-0.5 rounded hover:bg-accent shrink-0"
@@ -181,27 +200,81 @@ export function CategoryPicker({
                     )}
                     onClick={() => handleSelect(parent.id)}
                   >
-                    <div
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ backgroundColor: parent.color ?? "#94a3b8" }}
+                    <CategoryIcon
+                      iconName={parent.icon}
+                      className="h-3.5 w-3.5 shrink-0"
+                      style={{ color: parent.color ?? "#94a3b8" }}
                     />
                     {parent.name}
                   </button>
+                  <button
+                    className="p-0.5 rounded hover:bg-accent shrink-0 opacity-0 group-hover/parent:opacity-100 transition-opacity mr-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAddingTo(parent.id);
+                      setNewSubName("");
+                      // Expand parent to show new input
+                      setExpanded((prev) => new Set(prev).add(parent.id));
+                    }}
+                    title={`Add subcategory to ${parent.name}`}
+                  >
+                    <Plus className="h-3 w-3 text-muted-foreground" />
+                  </button>
                 </div>
 
-                {isExpanded &&
-                  children.map((child) => (
-                    <button
-                      key={child.id}
-                      className={cn(
-                        "w-full text-left pl-8 pr-2 py-1.5 text-xs rounded hover:bg-accent flex items-center gap-1.5 text-muted-foreground",
-                        value === child.id && "bg-accent text-foreground"
-                      )}
-                      onClick={() => handleSelect(child.id)}
-                    >
-                      {child.name}
-                    </button>
-                  ))}
+                {/* Children */}
+                {isExpanded && (
+                  <>
+                    {children.map((child) => (
+                      <button
+                        key={child.id}
+                        className={cn(
+                          "w-full text-left pl-8 pr-2 py-1.5 text-xs rounded hover:bg-accent flex items-center gap-1.5 text-muted-foreground",
+                          value === child.id && "bg-accent text-foreground"
+                        )}
+                        onClick={() => handleSelect(child.id)}
+                      >
+                        {child.name}
+                      </button>
+                    ))}
+
+                    {/* Inline add subcategory */}
+                    {isAddingHere && (
+                      <div className="flex items-center gap-1 pl-6 pr-1 py-1">
+                        <Input
+                          placeholder="Subcategory name..."
+                          value={newSubName}
+                          onChange={(e) => setNewSubName(e.target.value)}
+                          className="h-6 text-xs flex-1"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleCreateSub(parent.id, parent.color);
+                            if (e.key === "Escape") {
+                              setAddingTo(null);
+                              setNewSubName("");
+                            }
+                          }}
+                        />
+                        <button
+                          className="p-0.5 rounded hover:bg-accent shrink-0"
+                          onClick={() => handleCreateSub(parent.id, parent.color)}
+                          disabled={!newSubName.trim()}
+                        >
+                          <Check className="h-3 w-3 text-muted-foreground" />
+                        </button>
+                        <button
+                          className="p-0.5 rounded hover:bg-accent shrink-0"
+                          onClick={() => {
+                            setAddingTo(null);
+                            setNewSubName("");
+                          }}
+                        >
+                          <X className="h-3 w-3 text-muted-foreground" />
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             );
           })}
@@ -210,56 +283,6 @@ export function CategoryPicker({
             <p className="text-xs text-muted-foreground text-center py-3">
               No categories found
             </p>
-          )}
-        </div>
-
-        {/* Create custom category */}
-        <div className="border-t p-2">
-          {creating ? (
-            <div className="flex items-center gap-1">
-              <Input
-                placeholder="Category name"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="h-7 text-xs flex-1"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreate();
-                  if (e.key === "Escape") {
-                    setCreating(false);
-                    setNewName("");
-                  }
-                }}
-              />
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 shrink-0"
-                onClick={handleCreate}
-                disabled={!newName.trim()}
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 shrink-0"
-                onClick={() => {
-                  setCreating(false);
-                  setNewName("");
-                }}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          ) : (
-            <button
-              className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent flex items-center gap-1.5 text-muted-foreground"
-              onClick={() => setCreating(true)}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Create custom category
-            </button>
           )}
         </div>
       </PopoverContent>

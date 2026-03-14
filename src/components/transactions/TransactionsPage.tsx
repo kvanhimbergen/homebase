@@ -99,6 +99,7 @@ export function Component() {
   const [matchTxn, setMatchTxn] = useState<Tables<"transactions"> | null>(null);
   const [detailTxn, setDetailTxn] = useState<(Tables<"transactions"> & { categories: Tables<"categories"> | null; accounts: Tables<"accounts"> | null }) | null>(null);
   const [checksOnly, setChecksOnly] = useState(false);
+  const [lowConfidenceOnly, setLowConfidenceOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(
     !!searchParams.get("categoryId") || !!initialAmountType
   );
@@ -162,6 +163,7 @@ export function Component() {
     minAmount: parsedMin != null && !isNaN(parsedMin) ? parsedMin : undefined,
     maxAmount: parsedMax != null && !isNaN(parsedMax) ? parsedMax : undefined,
     hasCheckNumber: checksOnly || undefined,
+    maxAiConfidence: lowConfidenceOnly ? 0.7 : undefined,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
   });
@@ -550,6 +552,13 @@ export function Component() {
                 />
                 Checks only
               </label>
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <Checkbox
+                  checked={lowConfidenceOnly}
+                  onCheckedChange={(checked) => setLowConfidenceOnly(!!checked)}
+                />
+                Low confidence
+              </label>
               <Button
                 variant="ghost"
                 size="sm"
@@ -561,6 +570,7 @@ export function Component() {
                   setMinAmount("");
                   setMaxAmount("");
                   setChecksOnly(false);
+                  setLowConfidenceOnly(false);
                   setStartDate(format(subMonths(new Date(), 3), "yyyy-MM-dd"));
                   setEndDate(format(new Date(), "yyyy-MM-dd"));
                   setSortBy("date");

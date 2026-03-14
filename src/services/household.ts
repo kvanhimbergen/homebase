@@ -97,7 +97,7 @@ export async function seedDefaultCategories(householdId: string) {
         is_system: true,
       }))
     )
-    .select("id, name, color");
+    .select("id, name, color, icon");
 
   if (parentError) throw parentError;
   if (!inserted) return;
@@ -134,6 +134,7 @@ export async function seedDefaultCategories(householdId: string) {
         household_id: householdId,
         name,
         color: parent.color,
+        icon: parent.icon,
         parent_id: parent.id,
         is_system: true,
       }));
@@ -173,7 +174,7 @@ export async function seedDefaultDocumentCategories(householdId: string) {
         is_system: true,
       }))
     )
-    .select("id, name, color");
+    .select("id, name, color, icon");
 
   if (parentError) throw parentError;
   if (!inserted) return;
@@ -267,7 +268,7 @@ export async function backfillSubcategories(householdId: string) {
   // Fetch existing categories for this household
   const { data: existing, error: fetchError } = await supabase
     .from("categories")
-    .select("id, name, parent_id, color")
+    .select("id, name, parent_id, color, icon")
     .eq("household_id", householdId);
 
   if (fetchError) throw fetchError;
@@ -292,7 +293,7 @@ export async function backfillSubcategories(householdId: string) {
           is_system: true,
         }))
       )
-      .select("id, name, color");
+      .select("id, name, color, icon");
 
     if (parentError) throw parentError;
     for (const p of newParents ?? []) {
@@ -311,6 +312,7 @@ export async function backfillSubcategories(householdId: string) {
           household_id: householdId,
           name,
           color: parent.color,
+          icon: parent.icon,
           parent_id: parent.id,
           is_system: true,
         }));
@@ -322,6 +324,18 @@ export async function backfillSubcategories(householdId: string) {
       .from("categories")
       .insert(subcategoryRows);
     if (subError) throw subError;
+  }
+
+  // Fix existing subcategories missing icons — inherit from parent
+  const subsWithoutIcon = existing?.filter((c) => c.parent_id && !c.icon) ?? [];
+  for (const sub of subsWithoutIcon) {
+    const parent = existing?.find((c) => c.id === sub.parent_id);
+    if (parent?.icon) {
+      await supabase
+        .from("categories")
+        .update({ icon: parent.icon })
+        .eq("id", sub.id);
+    }
   }
 
   return { parentsAdded: missingParents.length, subcategoriesAdded: subcategoryRows.length };
